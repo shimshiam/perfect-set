@@ -10,16 +10,18 @@
 ## 2. Project Architecture
 ```text
 /health-form-tracker
-├── /frontend               # React app 
+├── /frontend               # React app (next)
 ├── /backend
 │   ├── __init__.py         # Package marker
-│   ├── main.py             # Local test suite (OpenCV window)
-│   ├── /models             # MediaPipe/PyTorch initialization
+│   ├── server.py           # FastAPI + WebSocket server
+│   ├── main.py             # Local OpenCV test suite
+│   ├── test_ws.py          # WebSocket integration test
+│   ├── /models
 │   │   └── pose_detector.py
-│   ├── /heuristics         # Biomechanical logic
+│   ├── /heuristics
 │   │   ├── pushup.py
 │   │   └── squat.py        # Placeholder
-│   └── /utils              # Math and drawing utilities
+│   └── /utils
 │       ├── geometry.py
 │       └── video_utils.py
 ```
@@ -39,6 +41,7 @@
 * [x] **`backend/heuristics/pushup.py`:** State-machine tracker with form-gated rep counting.
 * [x] **`backend/utils/video_utils.py`:** Visualization module for skeleton drawing and HUD overlay.
 * [x] **`backend/main.py`:** Local OpenCV test suite consuming tracker angles directly.
+* [x] **`backend/server.py`:** FastAPI WebSocket server — tested and verified end-to-end.
 
 ### Unresolved Bugs / Known Issues:
 * **Environment Jitter:** Potential for minor landmark jitter; may need a temporal smoothing buffer in future iterations.
@@ -48,8 +51,9 @@
 * *[Fixed]* **Missing `__init__.py` Files:** All backend subdirectories now have package markers.
 
 ### Immediate Next Steps:
-* **FastAPI Integration:** Create `backend/server.py` with a WebSocket endpoint for real-time frame processing.
-* **Frontend Development:** Initialize the React application to consume the WebSocket stream and provide a modern, responsive UI.
+* **Frontend Development:** Initialize the React + Vite application to consume the WebSocket stream.
+* **Canvas Rendering:** Draw skeleton and HUD on the client side using landmark data from the server.
+* **Session Dashboard:** Build a polished dark-mode UI with rep history, form stats, and live feedback.
 
 ## 5. Development Protocols
 
