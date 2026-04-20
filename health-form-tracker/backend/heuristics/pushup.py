@@ -33,6 +33,8 @@ class PushupTracker:
         
         self.state = PushupState.PAUSED
         self.rep_count = 0
+        # Track whether form was maintained throughout the current rep cycle
+        self._form_maintained_during_rep = True
         
     def process_frame(self, landmarks_dict: Dict[str, Tuple[float, float]]) -> Dict[str, Any]:
         """
@@ -47,6 +49,8 @@ class PushupTracker:
             - state: String representation of current phase (e.g., 'UP', 'DESCENDING').
             - perfect_form: Boolean indicating if posture is currently good.
             - warnings: List of warning strings.
+            - elbow_angle: Current computed elbow angle (or None).
+            - back_angle: Current computed back angle (or None).
         """
         warnings: List[str] = []
         perfect_form = True
@@ -65,7 +69,9 @@ class PushupTracker:
                 "rep_count": self.rep_count,
                 "state": self.state.name,
                 "perfect_form": False,
-                "warnings": ["Landmarks missing"]
+                "warnings": ["Landmarks missing"],
+                "elbow_angle": None,
+                "back_angle": None
             }
             
         # Calculate angles
@@ -104,6 +110,8 @@ class PushupTracker:
         if back_angle < self.back_extension_tolerance:
             perfect_form = False
             warnings.append("Keep your back straight")
+            # Mark that form was broken during this rep cycle
+            self._form_maintained_during_rep = False
             
         # State Machine Logic
         if self.state == PushupState.PAUSED:
@@ -117,6 +125,8 @@ class PushupTracker:
         elif self.state == PushupState.UP:
             if elbow_angle < self.elbow_extension_threshold:
                 self.state = PushupState.DESCENDING
+                # Reset form tracking for the new rep cycle
+                self._form_maintained_during_rep = True
                 
         elif self.state == PushupState.DESCENDING:
             if elbow_angle <= self.elbow_flexion_threshold:
@@ -131,7 +141,13 @@ class PushupTracker:
         elif self.state == PushupState.ASCENDING:
             if elbow_angle >= self.elbow_extension_threshold:
                 self.state = PushupState.UP
-                self.rep_count += 1
+                # Only count the rep if form was maintained throughout
+                if self._form_maintained_during_rep:
+                    self.rep_count += 1
+                else:
+                    warnings.append("Rep not counted: bad form")
+                # Reset for next rep
+                self._form_maintained_during_rep = True
             elif elbow_angle <= self.elbow_flexion_threshold:
                 self.state = PushupState.BOTTOM
                 
@@ -139,5 +155,7 @@ class PushupTracker:
             "rep_count": self.rep_count,
             "state": self.state.name,
             "perfect_form": perfect_form,
-            "warnings": warnings
+            "warnings": warnings,
+            "elbow_angle": elbow_angle,
+            "back_angle": back_angle
         }

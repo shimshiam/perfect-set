@@ -43,7 +43,7 @@ def draw_angles(img: np.ndarray, landmarks: Dict[str, Tuple[float, float]], elbo
     h, w, _ = img.shape
     font = cv2.FONT_HERSHEY_SIMPLEX
     
-    # Find a representative joint to anchor the text (preferring the right side if available)
+    # Anchor text to whichever side is visible (prefer right since pushups are often filmed from the side)
     anchor_side = 'right' if 'right_elbow' in landmarks else 'left'
     
     if f'{anchor_side}_elbow' in landmarks:
@@ -61,30 +61,46 @@ def draw_angles(img: np.ndarray, landmarks: Dict[str, Tuple[float, float]], elbo
 def draw_hud(img: np.ndarray, status: Dict[str, Any], fps: int):
     """
     Draws a premium HUD overlay with rep counts and form feedback.
+    Handles both active tracking and "no person detected" states.
     """
-    # Create semi-transparent overlay
-    overlay = img.copy()
-    cv2.rectangle(overlay, (10, 10), (320, 220), (30, 30, 30), -1)
-    cv2.addWeighted(overlay, 0.6, img, 0.4, 0, img)
-    
+    h, w, _ = img.shape
     font = cv2.FONT_HERSHEY_SIMPLEX
     
-    # Rep Count
-    cv2.putText(img, "REPS", (30, 50), font, 0.6, (180, 180, 180), 1)
-    cv2.putText(img, f"{status['rep_count']}", (30, 100), font, 1.8, (0, 255, 0), 4)
+    # Clamp HUD dimensions to the image size
+    hud_w = min(320, w - 20)
+    hud_h = min(220, h - 20)
     
-    # State / Phase
-    cv2.putText(img, "PHASE", (160, 50), font, 0.6, (180, 180, 180), 1)
-    cv2.putText(img, status['state'], (160, 90), font, 1.0, (255, 255, 0), 2)
+    # Create semi-transparent overlay
+    overlay = img.copy()
+    cv2.rectangle(overlay, (10, 10), (10 + hud_w, 10 + hud_h), (30, 30, 30), -1)
+    cv2.addWeighted(overlay, 0.6, img, 0.4, 0, img)
     
-    # Form Feedback
-    form_color = (0, 255, 0) if status['perfect_form'] else (0, 0, 255)
-    form_text = "FORM: PERFECT" if status['perfect_form'] else "FORM: ADJUST"
-    cv2.putText(img, form_text, (30, 150), font, 0.8, form_color, 2)
+    # Check if we have a person (angles are None when landmarks are missing)
+    has_person = status.get('elbow_angle') is not None
     
-    # Warning message
-    if not status['perfect_form'] and status['warnings']:
-        cv2.putText(img, f"! {status['warnings'][0]}", (30, 190), font, 0.6, (0, 0, 255), 2)
+    if has_person:
+        # Rep Count
+        cv2.putText(img, "REPS", (30, 50), font, 0.6, (180, 180, 180), 1)
+        cv2.putText(img, f"{status['rep_count']}", (30, 100), font, 1.8, (0, 255, 0), 4)
         
-    # FPS in corner
-    cv2.putText(img, f"FPS: {fps}", (img.shape[1] - 100, 30), font, 0.7, (0, 255, 0), 2)
+        # State / Phase
+        cv2.putText(img, "PHASE", (160, 50), font, 0.6, (180, 180, 180), 1)
+        cv2.putText(img, status['state'], (160, 90), font, 1.0, (255, 255, 0), 2)
+        
+        # Form Feedback
+        form_color = (0, 255, 0) if status['perfect_form'] else (0, 0, 255)
+        form_text = "FORM: PERFECT" if status['perfect_form'] else "FORM: ADJUST"
+        cv2.putText(img, form_text, (30, 150), font, 0.8, form_color, 2)
+        
+        # Warning message
+        if status['warnings']:
+            cv2.putText(img, f"! {status['warnings'][0]}", (30, 190), font, 0.6, (0, 0, 255), 2)
+    else:
+        # No person detected — show waiting state
+        cv2.putText(img, "REPS", (30, 50), font, 0.6, (180, 180, 180), 1)
+        cv2.putText(img, f"{status['rep_count']}", (30, 100), font, 1.8, (100, 100, 100), 4)
+        cv2.putText(img, "Waiting for pose...", (30, 150), font, 0.7, (100, 100, 255), 2)
+        
+    # FPS in top-right corner (clamped to image width)
+    fps_x = max(w - 120, 10)
+    cv2.putText(img, f"FPS: {fps}", (fps_x, 30), font, 0.7, (0, 255, 0), 2)

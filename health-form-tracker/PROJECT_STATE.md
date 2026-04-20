@@ -2,7 +2,7 @@
 
 ## 1. The Tech Stack
 * **Backend:** Python, FastAPI, WebSockets (for real-time streaming).
-* **Computer Vision & AI:** OpenCV (frame processing), PyTorch (for potential custom models later), and MediaPipe Pose (for initial lightweight, CPU-friendly MVP).
+* **Computer Vision & AI:** OpenCV (frame processing), PyTorch (for potential custom models later), and MediaPipe Pose 0.10.14 (for initial lightweight, CPU-friendly MVP).
 * **Frontend:** React.js.
 * **Hardware:** Standard local webcam. 
 * **Environment:** Device-agnostic (handling CPU or CUDA gracefully).
@@ -12,33 +12,43 @@
 /health-form-tracker
 ├── /frontend               # React app 
 ├── /backend
-│   ├── main.py             # FastAPI server & WebSockets
+│   ├── __init__.py         # Package marker
+│   ├── main.py             # Local test suite (OpenCV window)
 │   ├── /models             # MediaPipe/PyTorch initialization
-│   ├── /heuristics         # Biomechanical logic (pushup.py)
+│   │   └── pose_detector.py
+│   ├── /heuristics         # Biomechanical logic
+│   │   ├── pushup.py
+│   │   └── squat.py        # Placeholder
 │   └── /utils              # Math and drawing utilities
+│       ├── geometry.py
+│       └── video_utils.py
 ```
 
 ## 3. Core Mathematical Heuristics (The Pushup Logic)
 * **Rep Counter:** A rep is only counted if the elbow angle (shoulder-elbow-wrist) breaks below 90 degrees on the descent and returns to ~160-180 degrees on the ascent.
+* **Form Gating:** Reps performed with bad form (back angle below 165°) are detected but NOT counted. The user sees "Rep not counted: bad form."
 * **Form Correction:** The back must remain straight. The angle between the shoulder, hip, and ankle must remain approximately 170-180 degrees. If it dips or bows, trigger a form warning.
 * **Angle Calculation:** We calculate the angles of specific joints using the dot product of two vectors derived from (x, y) coordinates. 
 
 ## 4. Current State & Progress
 
 ### Completed Modules:
-* [x] **Project Structure:** Initial directory skeleton setup.
-* [x] **`backend/utils/geometry.py`:** Created robust `calculate_angle` function using vector dot products.
-* [x] **`backend/models/pose_detector.py`:** Built `PoseDetector` wrapper with fallback mechanisms for better environment compatibility.
-* [x] **`backend/heuristics/pushup.py`:** Developed a state-machine based tracker for rep counting and form feedback.
-* [x] **`backend/utils/video_utils.py`:** Created dedicated visualization module for skeleton drawing and premium HUD.
-* [x] **Code Review & Refactoring:** Modularized the local test suite and decoupled visualization from core logic.
+* [x] **Project Structure:** Directory skeleton with proper `__init__.py` package markers.
+* [x] **`backend/utils/geometry.py`:** Robust `calculate_angle` function using vector dot products.
+* [x] **`backend/models/pose_detector.py`:** `PoseDetector` wrapper for MediaPipe Pose.
+* [x] **`backend/heuristics/pushup.py`:** State-machine tracker with form-gated rep counting.
+* [x] **`backend/utils/video_utils.py`:** Visualization module for skeleton drawing and HUD overlay.
+* [x] **`backend/main.py`:** Local OpenCV test suite consuming tracker angles directly.
 
 ### Unresolved Bugs / Known Issues:
 * **Environment Jitter:** Potential for minor landmark jitter; may need a temporal smoothing buffer in future iterations.
-* *[Fixed]* **HUD Angle Display Bug:** The visual debugger in `main.py` hardcoded the `calculate_angle` check to the `left` side, which would have displayed 0.0 or incorrect angles if the user's left side was occluded. Fixed by dynamically tracking the `anchor_side` to match `draw_angles`.
+* *[Fixed]* **HUD Angle Display Bug:** Hardcoded left-side anchoring replaced with dynamic side detection.
+* *[Fixed]* **Bad-Form Reps Counted:** Reps are now form-gated; only counted if back alignment was maintained throughout the full cycle.
+* *[Fixed]* **Redundant Angle Calculation:** `main.py` no longer recalculates angles; consumes them from the tracker's status dict.
+* *[Fixed]* **Missing `__init__.py` Files:** All backend subdirectories now have package markers.
 
 ### Immediate Next Steps:
-* **FastAPI Integration:** Refactor `backend/main.py` into a FastAPI application serving results over WebSockets.
+* **FastAPI Integration:** Create `backend/server.py` with a WebSocket endpoint for real-time frame processing.
 * **Frontend Development:** Initialize the React application to consume the WebSocket stream and provide a modern, responsive UI.
 
 ## 5. Development Protocols

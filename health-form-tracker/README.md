@@ -11,7 +11,7 @@ Designed for users managing daily rep goals or strict hypertrophy routines, this
 ## Key Features
 
 *   **Real-Time Inference:** Low-latency video processing and form feedback streamed via WebSockets.
-*   **Algorithmic Strictness:** Mathematical heuristics that only count reps meeting exact biomechanical angle thresholds.
+*   **Algorithmic Strictness:** Mathematical heuristics that only count reps meeting exact biomechanical angle thresholds. Reps performed with bad form are detected and rejected.
 *   **Privacy-First:** Edge-based processing means your webcam feed never leaves your local machine.
 *   **Modern Stack:** A decoupled architecture utilizing a React frontend and a robust Python/FastAPI backend.
 
@@ -21,11 +21,13 @@ To test the pushup tracker locally using your webcam:
 
 1.  **Install dependencies:**
     ```bash
+    cd health-form-tracker
     uv pip install -r requirements.txt
     ```
 2.  **Run the local test script:**
     ```bash
-    # From the project root
-    uv run python backend/main.py
+    # From the health-form-tracker/backend/ directory
+    cd backend
+    python main.py
     ```
 3.  **Usage:** A window will open mirroring your webcam. Perform pushups to see the rep counter and form feedback in real-time. Press **'q'** in the video window to exit.
