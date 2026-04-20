@@ -60,7 +60,7 @@ class PoseDetector:
         
         for lm_name in target_landmarks:
             try:
-                lm_enum = getattr(mp_pose.PoseLandmark, lm_name)
+                lm_enum = getattr(self.mp_pose.PoseLandmark, lm_name)
                 landmark = results.pose_landmarks.landmark[lm_enum]
                 # Store as normalized coordinates (0.0 to 1.0)
                 landmarks_dict[lm_name.lower()] = (landmark.x, landmark.y)
