@@ -1,6 +1,6 @@
 from enum import Enum, auto
 from typing import Dict, Tuple, List, Any
-from ..utils.geometry import calculate_angle
+from utils.geometry import calculate_angle
 
 class PushupState(Enum):
     UP = auto()
