@@ -1,15 +1,15 @@
 import cv2
 import time
-import mediapipe as mp
 from models.pose_detector import PoseDetector
 from heuristics.pushup import PushupTracker
+from utils.geometry import calculate_angle
+from utils.video_utils import draw_skeleton, draw_hud, draw_angles
 
 def main():
     print("Initializing components...")
+    # Initialize detector and tracker
     detector = PoseDetector()
     tracker = PushupTracker()
-    mp_drawing = mp.solutions.drawing_utils
-    mp_pose = mp.solutions.pose
     
     print("Opening webcam...")
     cap = cv2.VideoCapture(0)
@@ -19,7 +19,7 @@ def main():
         return
 
     p_time = 0
-    print("Starting test. Press 'q' in the video window to quit.")
+    print("Starting tracker. Press 'q' in the video window to quit.")
     
     try:
         while True:
@@ -31,41 +31,49 @@ def main():
             # Mirror the image horizontally for a more natural selfie-view
             img = cv2.flip(img, 1)
 
+            # 1. Pose Inference
             results = detector.find_pose(img)
             landmarks_dict = detector.extract_landmarks(results)
             
-            # Draw landmarks on the image
-            if results and results.pose_landmarks:
-                mp_drawing.draw_landmarks(img, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+            # 2. Heuristic Analysis
+            status = tracker.process_frame(landmarks_dict)
             
+            # 3. Visualization logic
             if landmarks_dict:
-                status = tracker.process_frame(landmarks_dict)
+                # Draw skeleton lines
+                draw_skeleton(img, landmarks_dict)
                 
-                # Display HUD
-                cv2.putText(img, f"Reps: {status['rep_count']}", (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 3)
-                cv2.putText(img, f"State: {status['state']}", (10, 130), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+                # Extract angles for visualization
+                # We dynamically anchor to whichever side is visible so angles draw correctly.
+                anchor = 'right' if 'right_elbow' in landmarks_dict else 'left'
                 
-                form_color = (0, 255, 0) if status['perfect_form'] else (0, 0, 255)
-                form_text = "Form: Perfect" if status['perfect_form'] else "Form: Bad"
-                cv2.putText(img, form_text, (10, 180), cv2.FONT_HERSHEY_SIMPLEX, 1, form_color, 2)
+                v_elbow = 0.0
+                if f'{anchor}_shoulder' in landmarks_dict and f'{anchor}_elbow' in landmarks_dict and f'{anchor}_wrist' in landmarks_dict:
+                    v_elbow = calculate_angle(landmarks_dict[f'{anchor}_shoulder'], 
+                                            landmarks_dict[f'{anchor}_elbow'], 
+                                            landmarks_dict[f'{anchor}_wrist'])
+                                            
+                v_back = 0.0
+                if f'{anchor}_shoulder' in landmarks_dict and f'{anchor}_hip' in landmarks_dict and f'{anchor}_ankle' in landmarks_dict:
+                    v_back = calculate_angle(landmarks_dict[f'{anchor}_shoulder'], 
+                                           landmarks_dict[f'{anchor}_hip'], 
+                                           landmarks_dict[f'{anchor}_ankle'])
                 
-                if not status['perfect_form'] and status['warnings']:
-                    cv2.putText(img, f"Warning: {status['warnings'][0]}", (10, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-            else:
-                cv2.putText(img, "No person detected", (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-
-            # Calculate and display FPS
+                draw_angles(img, landmarks_dict, v_elbow, v_back)
+            
+            # Calculate FPS
             c_time = time.time()
-            fps = 1 / (c_time - p_time) if (c_time - p_time) > 0 else 0
+            fps = int(1 / (c_time - p_time)) if (c_time - p_time) > 0 else 0
             p_time = c_time
-            cv2.putText(img, f"FPS: {int(fps)}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
             
-            # Show the final frame
-            cv2.imshow("Pushup Tracker Test", img)
+            # Draw the premium HUD
+            draw_hud(img, status, fps)
             
-            # Wait for 1ms and check for 'q' key press to break the loop
+            # Display the result
+            cv2.imshow("Perfect Set - Physical Form Tracker", img)
+            
             if cv2.waitKey(1) & 0xFF == ord('q'):
-                print("Quitting test...")
+                print("Quitting...")
                 break
                 
     finally:

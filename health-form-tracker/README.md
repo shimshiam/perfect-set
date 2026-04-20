@@ -14,3 +14,18 @@ Designed for users managing daily rep goals or strict hypertrophy routines, this
 *   **Algorithmic Strictness:** Mathematical heuristics that only count reps meeting exact biomechanical angle thresholds.
 *   **Privacy-First:** Edge-based processing means your webcam feed never leaves your local machine.
 *   **Modern Stack:** A decoupled architecture utilizing a React frontend and a robust Python/FastAPI backend.
+
+## Getting Started (Local Development)
+
+To test the pushup tracker locally using your webcam:
+
+1.  **Install dependencies:**
+    ```bash
+    uv pip install -r requirements.txt
+    ```
+2.  **Run the local test script:**
+    ```bash
+    # From the project root
+    uv run python backend/main.py
+    ```
+3.  **Usage:** A window will open mirroring your webcam. Perform pushups to see the rep counter and form feedback in real-time. Press **'q'** in the video window to exit.

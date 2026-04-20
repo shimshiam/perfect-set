@@ -3,6 +3,14 @@ import mediapipe as mp
 import numpy as np
 from typing import Optional, Dict, Any, Tuple
 
+# Direct import of solutions can sometimes bypass naming conflicts in certain environments
+# We define it at the module level to ensure it's available
+try:
+    mp_pose = mp.solutions.pose
+except AttributeError:
+    # Fallback for older or specific versions of MediaPipe
+    import mediapipe.python.solutions.pose as mp_pose
+
 class PoseDetector:
     """
     A wrapper class for initializing and using the MediaPipe Pose model.
@@ -16,21 +24,8 @@ class PoseDetector:
                  smooth_segmentation: bool = True,
                  min_detection_confidence: float = 0.5,
                  min_tracking_confidence: float = 0.5):
-        """
-        Initializes the MediaPipe Pose detector.
-        
-        Args:
-            static_image_mode: Whether to treat the input images as a batch of static 
-                               and possibly unrelated images, or a video stream.
-            model_complexity: Complexity of the pose landmark model: 0, 1 or 2.
-            smooth_landmarks: Whether to filter landmarks across different input images to reduce jitter.
-            enable_segmentation: Whether to predict segmentation mask.
-            smooth_segmentation: Whether to filter segmentation across different input images.
-            min_detection_confidence: Minimum confidence value for the person detection to be considered successful.
-            min_tracking_confidence: Minimum confidence value for the pose tracking to be considered successful.
-        """
-        self.mp_pose = mp.solutions.pose
-        self.pose = self.mp_pose.Pose(
+        """Initializes the MediaPipe Pose detector."""
+        self.pose = mp_pose.Pose(
             static_image_mode=static_image_mode,
             model_complexity=model_complexity,
             smooth_landmarks=smooth_landmarks,
@@ -41,22 +36,12 @@ class PoseDetector:
         )
         
     def find_pose(self, img: np.ndarray) -> Optional[Any]:
-        """
-        Processes an image and returns the pose landmarks.
-        
-        Args:
-            img: A numpy ndarray representing an image (BGR format from OpenCV).
-            
-        Returns:
-            The MediaPipe pose results object, or None if an error occurs.
-        """
+        """Processes an image and returns the pose landmarks."""
         if img is None:
             return None
             
         # Convert the BGR image to RGB as MediaPipe expects RGB
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        
-        # To improve performance, optionally mark the image as not writeable to pass by reference
         img_rgb.flags.writeable = False
         results = self.pose.process(img_rgb)
         img_rgb.flags.writeable = True
@@ -66,21 +51,12 @@ class PoseDetector:
     def extract_landmarks(self, results: Any) -> Dict[str, Tuple[float, float]]:
         """
         Extracts key landmarks into a dictionary mapping body part names to (x, y) coordinates.
-        Coordinates are normalized [0.0, 1.0].
-        
-        Args:
-            results: The pose landmarks result from find_pose.
-            
-        Returns:
-            A dictionary of landmarks with names like 'left_shoulder', 'right_elbow', etc.
-            Returns an empty dict if no landmarks are found.
+        Returns an empty dict if no landmarks are detected.
         """
         landmarks_dict = {}
         if not results or not results.pose_landmarks:
             return landmarks_dict
             
-        # Map MediaPipe landmark enums to their normalized x, y coordinates
-        # For the pushup tracker, we primarily need shoulders, elbows, wrists, hips, and ankles.
         target_landmarks = [
             'LEFT_SHOULDER', 'RIGHT_SHOULDER', 
             'LEFT_ELBOW', 'RIGHT_ELBOW', 
@@ -91,11 +67,11 @@ class PoseDetector:
         
         for lm_name in target_landmarks:
             try:
-                lm_enum = getattr(self.mp_pose.PoseLandmark, lm_name)
+                lm_enum = getattr(mp_pose.PoseLandmark, lm_name)
                 landmark = results.pose_landmarks.landmark[lm_enum]
-                # Store as normalized coordinates. 
+                # Store as normalized coordinates (0.0 to 1.0)
                 landmarks_dict[lm_name.lower()] = (landmark.x, landmark.y)
-            except AttributeError:
+            except (AttributeError, IndexError):
                 continue
                 
         return landmarks_dict

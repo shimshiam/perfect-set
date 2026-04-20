@@ -27,11 +27,24 @@
 
 ### Completed Modules:
 * [x] **Project Structure:** Initial directory skeleton setup.
-* [x] **`backend/utils/geometry.py`:** Created robust `calculate_angle` function using vector dot products, handling floating-point errors and division by zero.
-* [x] **`backend/models/pose_detector.py`:** Built `PoseDetector` wrapper for MediaPipe to ingest OpenCV frames and extract normalized (x,y) landmarks for relevant joints.
+* [x] **`backend/utils/geometry.py`:** Created robust `calculate_angle` function using vector dot products.
+* [x] **`backend/models/pose_detector.py`:** Built `PoseDetector` wrapper with fallback mechanisms for better environment compatibility.
+* [x] **`backend/heuristics/pushup.py`:** Developed a state-machine based tracker for rep counting and form feedback.
+* [x] **`backend/utils/video_utils.py`:** Created dedicated visualization module for skeleton drawing and premium HUD.
+* [x] **Code Review & Refactoring:** Modularized the local test suite and decoupled visualization from core logic.
 
 ### Unresolved Bugs / Known Issues:
-* None currently. 
+* **Environment Jitter:** Potential for minor landmark jitter; may need a temporal smoothing buffer in future iterations.
+* *[Fixed]* **HUD Angle Display Bug:** The visual debugger in `main.py` hardcoded the `calculate_angle` check to the `left` side, which would have displayed 0.0 or incorrect angles if the user's left side was occluded. Fixed by dynamically tracking the `anchor_side` to match `draw_angles`.
 
 ### Immediate Next Steps:
-* Await direction for the next sprint (expected to be `backend/heuristics/pushup.py` implementation, integrating the geometry utilities and the pose detector).
+* **FastAPI Integration:** Refactor `backend/main.py` into a FastAPI application serving results over WebSockets.
+* **Frontend Development:** Initialize the React application to consume the WebSocket stream and provide a modern, responsive UI.
+
+## 5. Development Protocols
+
+### "Review the code" Protocol
+Whenever the user requests a code review, the AI must:
+1.  **Check for Errors:** Identify logic flaws, syntax errors, and potential bugs.
+2.  **Optimize:** Suggest or implement performance improvements and cleaner code patterns.
+3.  **Update Docs:** Proactively update `README.md` and `PROJECT_STATE.md` to reflect the latest changes or fixes.
