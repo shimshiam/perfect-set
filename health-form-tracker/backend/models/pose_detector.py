@@ -3,14 +3,6 @@ import mediapipe as mp
 import numpy as np
 from typing import Optional, Dict, Any, Tuple
 
-# Direct import of solutions can sometimes bypass naming conflicts in certain environments
-# We define it at the module level to ensure it's available
-try:
-    mp_pose = mp.solutions.pose
-except AttributeError:
-    # Fallback for older or specific versions of MediaPipe
-    import mediapipe.python.solutions.pose as mp_pose
-
 class PoseDetector:
     """
     A wrapper class for initializing and using the MediaPipe Pose model.
@@ -25,7 +17,8 @@ class PoseDetector:
                  min_detection_confidence: float = 0.5,
                  min_tracking_confidence: float = 0.5):
         """Initializes the MediaPipe Pose detector."""
-        self.pose = mp_pose.Pose(
+        self.mp_pose = mp.solutions.pose
+        self.pose = self.mp_pose.Pose(
             static_image_mode=static_image_mode,
             model_complexity=model_complexity,
             smooth_landmarks=smooth_landmarks,
