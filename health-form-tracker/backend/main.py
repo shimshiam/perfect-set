@@ -1,17 +1,20 @@
 import cv2
 import ssl
+import sys
 import time
 from models.pose_detector import PoseDetector
 from heuristics.pushup import PushupTracker
 from utils.video_utils import draw_skeleton, draw_hud, draw_angles
 
 # ── macOS SSL fix ──
-# Python 3.12 on macOS does not trust system certs by default.
-# This allows MediaPipe to download its model weights on first run.
-try:
-    ssl._create_default_https_context = ssl._create_unverified_context
-except AttributeError:
-    pass
+# Python 3.12 on macOS does not bundle root certs, causing MediaPipe's model
+# download to fail. Intentionally gated to darwin only so Windows/Linux users
+# retain full SSL certificate verification.
+if sys.platform == 'darwin':
+    try:
+        ssl._create_default_https_context = ssl._create_unverified_context
+    except AttributeError:
+        pass
 
 def main():
     print("Initializing components...")
