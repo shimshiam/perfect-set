@@ -5,7 +5,7 @@
  */
 import { useRef, useEffect } from 'react';
 import './Dashboard.css';
-import { playDing, playBuzz } from '../utils/audio.js';
+import { playDing, playBuzz, speak } from '../utils/audio.js';
 
 export default function Dashboard({ status, globalReps, isConnected, isReconnecting }) {
   const repRef = useRef(null);
@@ -25,6 +25,7 @@ export default function Dashboard({ status, globalReps, isConnected, isReconnect
         el.classList.add('dashboard__rep-pop');
       }
       playDing();
+      speak(globalReps.toString());
     }
     prevGlobalReps.current = globalReps;
   }, [globalReps]);
@@ -45,11 +46,15 @@ export default function Dashboard({ status, globalReps, isConnected, isReconnect
     if (isActive && !status.perfect_form && prevPerfectForm.current) {
       if (canBuzz) {
         playBuzz();
+        if (warnings.length > 0) {
+          speak(warnings[0]);
+        }
         lastBuzzTime.current = now;
       }
     } else if (hasAbortedWarning && !hadAbortedWarning) {
       if (canBuzz) {
         playBuzz();
+        speak("Rep not counted");
         lastBuzzTime.current = now;
       }
     }

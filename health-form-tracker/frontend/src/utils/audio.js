@@ -56,3 +56,20 @@ export function playBuzz() {
   osc.start();
   osc.stop(ctx.currentTime + 0.3);
 }
+
+/**
+ * Uses Web Speech API to provide verbal coaching.
+ */
+export function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  
+  // Cancel any currently speaking text to give immediate feedback
+  window.speechSynthesis.cancel();
+  
+  const utterance = new SpeechSynthesisUtterance(text);
+  // Slightly faster rate sounds more energetic/coach-like
+  utterance.rate = 1.15;
+  utterance.pitch = 1.0;
+  
+  window.speechSynthesis.speak(utterance);
+}
