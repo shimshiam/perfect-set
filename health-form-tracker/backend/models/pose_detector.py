@@ -2,6 +2,15 @@ import cv2
 import mediapipe as mp
 import numpy as np
 from typing import Optional, Dict, Any, Tuple
+import ssl
+
+# Fix for macOS SSL CERTIFICATE_VERIFY_FAILED error when MediaPipe downloads models
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
 
 class PoseDetector:
     """
