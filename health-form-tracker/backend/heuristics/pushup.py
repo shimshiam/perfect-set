@@ -105,11 +105,9 @@ class PushupTracker:
         left_ok = all(k in landmarks_dict for k in left_keys)
         right_ok = all(k in landmarks_dict for k in right_keys)
 
-        # ──────────────────────────────────────────────────────────
-        # FIX 4: Debounced landmark loss
+        # ── Debounced landmark loss ──
         # Hold the last known state for DEBOUNCE_FRAMES before dropping
         # to PAUSED, preventing UI flicker during brief confidence drops.
-        # ──────────────────────────────────────────────────────────
         if not left_ok and not right_ok:
             self._landmark_loss_counter += 1
             if self._landmark_loss_counter >= self.DEBOUNCE_FRAMES:
@@ -162,11 +160,9 @@ class PushupTracker:
         elbow_angle = sum(elbow_angles) / len(elbow_angles)
         back_angle = sum(back_angles) / len(back_angles)
 
-        # ──────────────────────────────────────────────────────────
-        # FIX 3: Proximity gate
+        # ── Proximity gate ──
         # When too close, 2D foreshortening makes elbows look bent.
         # Freeze the state machine and warn the user.
-        # ──────────────────────────────────────────────────────────
         if self._is_too_close(landmarks_dict):
             warnings.append("Step back from camera")
             return {
@@ -180,11 +176,9 @@ class PushupTracker:
                 "back_angle": back_angle,
             }
 
-        # ──────────────────────────────────────────────────────────
-        # FIX 1: Orientation gate
+        # ── Orientation gate ──
         # Only activate pushup tracking when the body is horizontal.
         # Standing + bending elbows must NOT count as reps.
-        # ──────────────────────────────────────────────────────────
         if not self._is_horizontal(landmarks_dict):
             self.state = PushupState.IDLE
             self._stabilize_counter = 0
@@ -200,12 +194,10 @@ class PushupTracker:
                 "back_angle": back_angle,
             }
 
-        # ──────────────────────────────────────────────────────────
-        # FIX 2: Stabilization gate
+        # ── Stabilization gate ──
         # Require N frames of continuous horizontal posture before
         # activating form checks. Prevents false "bad form" warnings
         # while the user is bending down to get into position.
-        # ──────────────────────────────────────────────────────────
         if self.state in (PushupState.PAUSED, PushupState.IDLE, PushupState.STABILIZING):
             self._stabilize_counter += 1
             if self._stabilize_counter < self.STABILIZE_FRAMES:
@@ -252,6 +244,8 @@ class PushupTracker:
                     rep_aborted = True
                 self._form_maintained = True
             elif elbow_angle <= self.ELBOW_FLEXION:
+                # Rep cut short — reset form flag so the new attempt starts clean
+                self._form_maintained = True
                 self.state = PushupState.BOTTOM
 
         # ── Form evaluation (only active after stabilization) ──

@@ -152,14 +152,19 @@ async def pushup_websocket(websocket: WebSocket):
 
             # --- Core pipeline ---
             try:
-                # MediaPipe processing is CPU-bound and synchronous. 
-                # We run it in a separate thread so it doesn't block the main asyncio event loop!
-                results = await asyncio.to_thread(detector.find_pose, img)
-                landmarks_dict = detector.extract_landmarks(results)
+                # MediaPipe processing AND landmark extraction are both CPU-bound.
+                # Run the full detection pipeline in a thread to avoid blocking
+                # the main asyncio event loop.
+                async def _run_pipeline():
+                    r = detector.find_pose(img)
+                    return detector.extract_landmarks(r)
+
+                landmarks_dict = await asyncio.to_thread(_run_pipeline)
                 status = tracker.process_frame(landmarks_dict)
 
                 rep_completed = status.pop("rep_completed", False)
                 rep_aborted = status.pop("rep_aborted", False)
+                current_rep_count = status["rep_count"]  # Capture before any further mutation
 
                 processing_ms = (time.perf_counter() - t_start) * 1000
 
@@ -177,9 +182,9 @@ async def pushup_websocket(websocket: WebSocket):
 
                 # Send rep events AFTER STATUS so client sees the correct count
                 if rep_completed:
-                    await websocket.send_json({"type": "REP_COMPLETED", "count": status.get("rep_count", 0)})
+                    await websocket.send_json({"type": "REP_COMPLETED", "count": current_rep_count})
                 if rep_aborted:
-                    await websocket.send_json({"type": "REP_ABORTED", "count": status.get("rep_count", 0)})
+                    await websocket.send_json({"type": "REP_ABORTED", "count": current_rep_count})
             except Exception as e:
                 logger.error(f"Processing error during core pipeline: {e}")
                 continue

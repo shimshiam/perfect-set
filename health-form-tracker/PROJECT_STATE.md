@@ -53,10 +53,10 @@
 * [x] **Project Structure:** Full-stack directory with `__init__.py` markers.
 * [x] **`backend/utils/geometry.py`:** `calculate_angle` using vector dot products.
 * [x] **`backend/models/pose_detector.py`:** `PoseDetector` wrapper for MediaPipe. Upgraded to `model_complexity=2`, raised confidence thresholds to 0.7, and added Exponential Moving Average (EMA) smoothing (`alpha=0.6`) on all landmarks to reduce tracking jitter.
-* [x] **`backend/heuristics/pushup.py`:** State-machine tracker with form-gated rep counting. (Fixed form check overriding bug during UP -> DESCENDING transition).
-* [x] **`backend/utils/video_utils.py`:** Visualization for local OpenCV test suite.
+* [x] **`backend/heuristics/pushup.py`:** State-machine tracker with form-gated rep counting. Fixed `_form_maintained` not being reset when ASCENDING is cut short back to BOTTOM, which would incorrectly reject the next clean rep. Cleaned up legacy FIX 1/2/3/4 scaffolding comment labels.
+* [x] **`backend/utils/video_utils.py`:** Visualization for local OpenCV test suite. Fixed `draw_angles` to resolve the best visible landmark side independently per joint (elbow vs. hip), preventing silent rendering miss.
 * [x] **`backend/main.py`:** Local OpenCV test suite. Added camera warmup loop and consecutive-failure retry counter (tolerates up to 10 bad frames before exiting). macOS SSL cert fix applied at entry-point.
-* [x] **`backend/server.py`:** FastAPI WebSocket server — verified end-to-end. macOS SSL fix applied at entry-point. Fixed `REP_COMPLETED`/`REP_ABORTED` event ordering: `STATUS` is now sent first so the client receives the correct `rep_count` before the rep event fires.
+* [x] **`backend/server.py`:** FastAPI WebSocket server — verified end-to-end. macOS SSL fix applied at entry-point (darwin-gated). Fixed `REP_COMPLETED`/`REP_ABORTED` event ordering. Fixed full pipeline (`find_pose` + `extract_landmarks`) to run in `asyncio.to_thread` so the event loop is never blocked. `rep_count` captured before status mutation for reliable event delivery.
 * [x] **`frontend/`:** React + Vite app with webcam capture, WebSocket streaming, skeleton overlay, dashboard, and session log. Verified full-stack pipeline.
 * [x] **Audio Feedback:** Real-time synthesized audio cues for counted reps (ding) and form warnings (buzz).
 * [x] **Session Export:** Download complete session logs as JSON with timestamps and form flags.

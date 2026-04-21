@@ -43,17 +43,20 @@ def draw_angles(img: np.ndarray, landmarks: Dict[str, Tuple[float, float]], elbo
     h, w, _ = img.shape
     font = cv2.FONT_HERSHEY_SIMPLEX
     
-    # Anchor text to whichever side is visible (prefer right since pushups are often filmed from the side)
-    anchor_side = 'right' if 'right_elbow' in landmarks else 'left'
+    # Resolve the best visible side independently per joint.
+    # This avoids silently dropping the back-angle label when the preferred
+    # side has an elbow but no hip (or vice versa).
+    elbow_side = 'right' if 'right_elbow' in landmarks else ('left' if 'left_elbow' in landmarks else None)
+    hip_side = 'right' if 'right_hip' in landmarks else ('left' if 'left_hip' in landmarks else None)
     
-    if f'{anchor_side}_elbow' in landmarks:
-        e_pt = landmarks[f'{anchor_side}_elbow']
+    if elbow_side and f'{elbow_side}_elbow' in landmarks:
+        e_pt = landmarks[f'{elbow_side}_elbow']
         cv2.putText(img, f"{int(elbow_angle)}deg", 
                     (int(e_pt[0] * w) + 15, int(e_pt[1] * h)), 
                     font, 0.6, (255, 255, 255), 2)
                     
-    if f'{anchor_side}_hip' in landmarks:
-        h_pt = landmarks[f'{anchor_side}_hip']
+    if hip_side and f'{hip_side}_hip' in landmarks:
+        h_pt = landmarks[f'{hip_side}_hip']
         cv2.putText(img, f"{int(back_angle)}deg", 
                     (int(h_pt[0] * w) + 15, int(h_pt[1] * h)), 
                     font, 0.6, (255, 255, 255), 2)
