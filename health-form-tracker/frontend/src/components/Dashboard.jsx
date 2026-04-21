@@ -5,12 +5,15 @@
  */
 import { useRef, useEffect } from 'react';
 import './Dashboard.css';
+import { playDing, playBuzz } from '../utils/audio.js';
 
 export default function Dashboard({ status, isConnected, isReconnecting }) {
   const repRef = useRef(null);
   const prevRepCount = useRef(0);
+  const prevPerfectForm = useRef(true);
+  const prevWarnings = useRef([]);
 
-  // Animate the rep counter on increment
+  // Animate the rep counter on increment and play audio cue
   useEffect(() => {
     if (!status) return;
     if (status.rep_count > prevRepCount.current) {
@@ -21,9 +24,30 @@ export default function Dashboard({ status, isConnected, isReconnecting }) {
         void el.offsetWidth;
         el.classList.add('dashboard__rep-pop');
       }
+      playDing();
     }
     prevRepCount.current = status.rep_count;
   }, [status?.rep_count]);
+
+  // Play audio cue for form penalties
+  useEffect(() => {
+    if (!status) return;
+    const activeStates = ['UP', 'DESCENDING', 'BOTTOM', 'ASCENDING'];
+    const isActive = status.elbow_angle != null && activeStates.includes(status.state);
+    const warnings = status.warnings || [];
+    
+    const hasAbortedWarning = warnings.includes("Rep not counted: bad form");
+    const hadAbortedWarning = prevWarnings.current.includes("Rep not counted: bad form");
+    
+    if (isActive && !status.perfect_form && prevPerfectForm.current) {
+      playBuzz();
+    } else if (hasAbortedWarning && !hadAbortedWarning) {
+      playBuzz();
+    }
+    
+    prevPerfectForm.current = status.perfect_form;
+    prevWarnings.current = warnings;
+  }, [status?.perfect_form, status?.state, status?.elbow_angle, status?.warnings]);
 
   const hasPerson = status?.elbow_angle != null;
   const repCount = status?.rep_count ?? 0;

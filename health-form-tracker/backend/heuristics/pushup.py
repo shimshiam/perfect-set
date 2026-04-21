@@ -28,7 +28,7 @@ class PushupTracker:
     # ── Angle Thresholds ──
     ELBOW_FLEXION = 90.0
     ELBOW_EXTENSION = 160.0
-    BACK_TOLERANCE = 165.0
+    BACK_TOLERANCE = 140.0
 
     # ── Orientation Gate ──
     # Max |avg_shoulder_y - avg_ankle_y| to be considered horizontal.

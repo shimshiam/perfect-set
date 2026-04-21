@@ -30,9 +30,32 @@ export default function SessionLog({ status }) {
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   };
 
+  const exportSession = () => {
+    if (reps.length === 0) return;
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(reps, null, 2));
+    const dlAnchorElem = document.createElement('a');
+    dlAnchorElem.setAttribute("href", dataStr);
+    dlAnchorElem.setAttribute("download", `perfect-set-session-${Date.now()}.json`);
+    document.body.appendChild(dlAnchorElem);
+    dlAnchorElem.click();
+    document.body.removeChild(dlAnchorElem);
+  };
+
   return (
     <section className="session-log" aria-label="Session rep history">
-      <h2 className="session-log__title">Session Log</h2>
+      <div className="session-log__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h2 className="session-log__title" style={{ margin: 0 }}>Session Log</h2>
+        {reps.length > 0 && (
+          <button 
+            className="session-log__export-btn" 
+            onClick={exportSession} 
+            style={{ padding: '6px 12px', fontSize: '0.8rem', cursor: 'pointer', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
+            title="Export session data to JSON"
+          >
+            Complete Set
+          </button>
+        )}
+      </div>
       {reps.length === 0 ? (
         <p className="session-log__empty">No reps recorded yet. Start your set!</p>
       ) : (
