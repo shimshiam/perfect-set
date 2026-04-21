@@ -97,6 +97,7 @@ class PushupTracker:
         warnings: List[str] = []
         perfect_form = True
         rep_completed = False
+        rep_aborted = False
 
         # ── Landmark presence check ──
         left_keys = ['left_shoulder', 'left_elbow', 'left_wrist', 'left_hip', 'left_ankle']
@@ -119,6 +120,7 @@ class PushupTracker:
             return {
                 "rep_count": self.rep_count,
                 "rep_completed": False,
+                "rep_aborted": False,
                 "state": self.state.name,
                 "perfect_form": False,
                 "warnings": ["Landmarks missing"] if self.state == PushupState.PAUSED else [],
@@ -170,6 +172,7 @@ class PushupTracker:
             return {
                 "rep_count": self.rep_count,
                 "rep_completed": False,
+                "rep_aborted": False,
                 "state": self.state.name,
                 "perfect_form": True,
                 "warnings": warnings,
@@ -189,6 +192,7 @@ class PushupTracker:
             return {
                 "rep_count": self.rep_count,
                 "rep_completed": False,
+                "rep_aborted": False,
                 "state": self.state.name,
                 "perfect_form": True,
                 "warnings": [],
@@ -209,6 +213,7 @@ class PushupTracker:
                 return {
                     "rep_count": self.rep_count,
                     "rep_completed": False,
+                    "rep_aborted": False,
                     "state": self.state.name,
                     "perfect_form": True,
                     "warnings": ["Getting into position..."],
@@ -244,6 +249,7 @@ class PushupTracker:
                     rep_completed = True
                 else:
                     warnings.append("Rep not counted: bad form")
+                    rep_aborted = True
                 self._form_maintained = True
             elif elbow_angle <= self.ELBOW_FLEXION:
                 self.state = PushupState.BOTTOM
@@ -257,6 +263,7 @@ class PushupTracker:
         return {
             "rep_count": self.rep_count,
             "rep_completed": rep_completed,
+            "rep_aborted": rep_aborted,
             "state": self.state.name,
             "perfect_form": perfect_form,
             "warnings": warnings,

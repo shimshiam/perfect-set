@@ -148,6 +148,8 @@ async def pushup_websocket(websocket: WebSocket):
 
                 if status.pop("rep_completed", False):
                     await websocket.send_json({"type": "REP_COMPLETED", "count": 1})
+                if status.pop("rep_aborted", False):
+                    await websocket.send_json({"type": "REP_ABORTED", "count": 1})
 
                 processing_ms = (time.perf_counter() - t_start) * 1000
 

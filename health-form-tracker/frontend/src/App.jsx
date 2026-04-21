@@ -14,11 +14,17 @@ export default function App() {
   const { videoRef, captureFrame, isReady, error: camError } = useWebcam();
   
   const [globalReps, setGlobalReps] = useState(0);
+  const [globalAbortedReps, setGlobalAbortedReps] = useState(0);
+
   const handleRepCompleted = useCallback(() => {
     setGlobalReps((prev) => prev + 1);
   }, []);
 
-  const { isConnected, isReconnecting, latestStatus, sendFrame, error: wsError } = useWebSocket(handleRepCompleted);
+  const handleRepAborted = useCallback(() => {
+    setGlobalAbortedReps((prev) => prev + 1);
+  }, []);
+
+  const { isConnected, isReconnecting, latestStatus, sendFrame, error: wsError } = useWebSocket(handleRepCompleted, handleRepAborted);
 
   const landmarks = latestStatus?.landmarks ?? null;
 
@@ -56,7 +62,7 @@ export default function App() {
             isConnected={isConnected}
             isReconnecting={isReconnecting}
           />
-          <SessionLog status={latestStatus} globalReps={globalReps} />
+          <SessionLog status={latestStatus} globalReps={globalReps} globalAbortedReps={globalAbortedReps} />
         </div>
       </main>
     </div>

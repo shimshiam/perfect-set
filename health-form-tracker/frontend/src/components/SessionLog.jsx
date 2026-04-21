@@ -5,24 +5,38 @@
 import { useState, useEffect, useRef } from 'react';
 import './SessionLog.css';
 
-export default function SessionLog({ status, globalReps }) {
+export default function SessionLog({ status, globalReps, globalAbortedReps = 0 }) {
   const [reps, setReps] = useState([]);
   const prevGlobalReps = useRef(0);
+  const prevGlobalAbortedReps = useRef(0);
   const listRef = useRef(null);
 
   useEffect(() => {
+    let newEntries = [];
+    const totalAttempts = globalReps + globalAbortedReps;
+
     if (globalReps > prevGlobalReps.current) {
-      setReps((prev) => [
-        {
-          rep: globalReps,
-          timestamp: Date.now(),
-          perfectForm: status ? status.perfect_form : true,
-        },
-        ...prev,
-      ]);
+      newEntries.push({
+        rep: totalAttempts,
+        timestamp: Date.now(),
+        perfectForm: true,
+      });
       prevGlobalReps.current = globalReps;
     }
-  }, [globalReps, status]);
+
+    if (globalAbortedReps > prevGlobalAbortedReps.current) {
+      newEntries.push({
+        rep: totalAttempts,
+        timestamp: Date.now(),
+        perfectForm: false,
+      });
+      prevGlobalAbortedReps.current = globalAbortedReps;
+    }
+
+    if (newEntries.length > 0) {
+      setReps((prev) => [...newEntries, ...prev]);
+    }
+  }, [globalReps, globalAbortedReps]);
 
   const formatTime = (ts) => {
     const d = new Date(ts);
