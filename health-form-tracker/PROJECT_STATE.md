@@ -2,7 +2,7 @@
 
 ## 1. The Tech Stack
 * **Backend:** Python, FastAPI, WebSockets (for real-time streaming).
-* **Computer Vision & AI:** OpenCV (frame processing), PyTorch (for potential custom models later), and MediaPipe Pose 0.10.14 (for initial lightweight, CPU-friendly MVP).
+* **Computer Vision & AI:** OpenCV (frame processing), PyTorch (for potential custom models later), and MediaPipe Pose 0.10.14 (`model_complexity=2` for maximum landmark accuracy, with EMA temporal smoothing for jitter reduction).
 * **Frontend:** React.js.
 * **Hardware:** Standard local webcam. 
 * **Environment:** Device-agnostic (handling CPU or CUDA gracefully).
@@ -52,7 +52,7 @@
 ### Completed Modules:
 * [x] **Project Structure:** Full-stack directory with `__init__.py` markers.
 * [x] **`backend/utils/geometry.py`:** `calculate_angle` using vector dot products.
-* [x] **`backend/models/pose_detector.py`:** `PoseDetector` wrapper for MediaPipe.
+* [x] **`backend/models/pose_detector.py`:** `PoseDetector` wrapper for MediaPipe. Upgraded to `model_complexity=2`, raised confidence thresholds to 0.7, and added Exponential Moving Average (EMA) smoothing (`alpha=0.6`) on all landmarks to reduce tracking jitter.
 * [x] **`backend/heuristics/pushup.py`:** State-machine tracker with form-gated rep counting. (Fixed form check overriding bug during UP -> DESCENDING transition).
 * [x] **`backend/utils/video_utils.py`:** Visualization for local OpenCV test suite.
 * [x] **`backend/main.py`:** Local OpenCV test suite.
@@ -62,7 +62,7 @@
 * [x] **Session Export:** Download complete session logs as JSON with timestamps and form flags.
 
 ### Unresolved Bugs / Known Issues:
-* **Environment Jitter:** Minor landmark jitter possible; may add temporal smoothing.
+* *(None currently — landmark jitter resolved via EMA smoothing and upgraded model complexity.)*
 
 ### Immediate Next Steps:
 * **Additional Exercises:** Implement squat tracker using the same state-machine pattern.

@@ -11,6 +11,7 @@ Designed for users managing daily rep goals or strict hypertrophy routines, this
 ## Key Features
 
 *   **Real-Time Inference:** Low-latency video processing and form feedback streamed via WebSockets.
+*   **Stable Tracking:** MediaPipe Pose running at `model_complexity=2` with EMA (Exponential Moving Average) temporal smoothing applied to all landmarks, eliminating jitter and ensuring skeleton lines stay precisely appended to limbs.
 *   **Algorithmic Strictness:** Mathematical heuristics that only count reps meeting exact biomechanical angle thresholds. Reps performed with bad form are detected and rejected.
 *   **Audio Coaching:** Built-in synthesized audio cues (ding for a perfect rep, buzz for bad form) allow you to maintain neutral neck posture while exercising.
 *   **Data Portability:** Export full session logs to JSON, complete with timestamps and form metadata, for integration with personal trackers.
