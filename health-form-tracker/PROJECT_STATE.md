@@ -40,7 +40,7 @@
 
 ## 3. Core Mathematical Heuristics (The Pushup Logic)
 * **Rep Counter:** A rep is only counted if the elbow angle breaks below 90deg on descent and returns to 160deg+ on ascent.
-* **Form Gating:** Reps with bad form (back angle < 165deg) are detected but NOT counted.
+* **Form Gating:** Reps with bad form (back angle < 140deg) are detected but NOT counted.
 * **Orientation Gate:** Compares shoulder Y vs ankle Y. If the person is standing upright, rep counting is locked (prevents "standing pushup" false positives).
 * **Stabilization Gate:** Requires 30 frames (~2s) of continuous horizontal posture before form checking activates (prevents false "bad form" during transition to floor).
 * **Proximity Gate:** If shoulder-to-shoulder x-distance exceeds 35% of frame width, tracking pauses with "Step back" warning (prevents depth distortion false reps).
@@ -58,12 +58,13 @@
 * [x] **`backend/main.py`:** Local OpenCV test suite.
 * [x] **`backend/server.py`:** FastAPI WebSocket server — verified end-to-end.
 * [x] **`frontend/`:** React + Vite app with webcam capture, WebSocket streaming, skeleton overlay, dashboard, and session log. Verified full-stack pipeline.
+* [x] **Audio Feedback:** Real-time synthesized audio cues for counted reps (ding) and form warnings (buzz).
+* [x] **Session Export:** Download complete session logs as JSON with timestamps and form flags.
 
 ### Unresolved Bugs / Known Issues:
 * **Environment Jitter:** Minor landmark jitter possible; may add temporal smoothing.
 
 ### Immediate Next Steps:
-* **Audio Feedback:** Add rep completion sound and form warning beep.
 * **Additional Exercises:** Implement squat tracker using the same state-machine pattern.
 * **Session Persistence:** Save session data to localStorage or a database.
 * **Production Build:** Deploy with HTTPS for secure webcam access on non-localhost.

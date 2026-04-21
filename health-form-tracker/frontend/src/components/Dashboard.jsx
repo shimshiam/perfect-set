@@ -47,7 +47,7 @@ export default function Dashboard({ status, isConnected, isReconnecting }) {
     
     prevPerfectForm.current = status.perfect_form;
     prevWarnings.current = warnings;
-  }, [status?.perfect_form, status?.state, status?.elbow_angle, status?.warnings]);
+  }, [status?.perfect_form, status?.state, status?.elbow_angle, status?.warnings?.join(',')]);
 
   const hasPerson = status?.elbow_angle != null;
   const repCount = status?.rep_count ?? 0;

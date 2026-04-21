@@ -12,6 +12,8 @@ Designed for users managing daily rep goals or strict hypertrophy routines, this
 
 *   **Real-Time Inference:** Low-latency video processing and form feedback streamed via WebSockets.
 *   **Algorithmic Strictness:** Mathematical heuristics that only count reps meeting exact biomechanical angle thresholds. Reps performed with bad form are detected and rejected.
+*   **Audio Coaching:** Built-in synthesized audio cues (ding for a perfect rep, buzz for bad form) allow you to maintain neutral neck posture while exercising.
+*   **Data Portability:** Export full session logs to JSON, complete with timestamps and form metadata, for integration with personal trackers.
 *   **Privacy-First:** Edge-based processing means your webcam feed never leaves your local machine.
 *   **Modern Stack:** A decoupled architecture utilizing a React frontend and a robust Python/FastAPI backend.
 

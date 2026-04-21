@@ -32,13 +32,15 @@ export default function SessionLog({ status }) {
 
   const exportSession = () => {
     if (reps.length === 0) return;
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(reps, null, 2));
+    const blob = new Blob([JSON.stringify(reps, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
     const dlAnchorElem = document.createElement('a');
-    dlAnchorElem.setAttribute("href", dataStr);
+    dlAnchorElem.setAttribute("href", url);
     dlAnchorElem.setAttribute("download", `perfect-set-session-${Date.now()}.json`);
     document.body.appendChild(dlAnchorElem);
     dlAnchorElem.click();
     document.body.removeChild(dlAnchorElem);
+    URL.revokeObjectURL(url);
   };
 
   return (
