@@ -32,7 +32,7 @@
 │   │   └── pose_detector.py
 │   ├── /heuristics
 │   │   ├── pushup.py
-│   │   └── squat.py
+│   │   └── squat.py  # Placeholder for future squat tracking
 │   └── /utils
 │       ├── geometry.py
 │       └── video_utils.py
@@ -73,6 +73,8 @@
 
 ### "Review the code" Protocol
 Whenever the user requests a code review, the AI must:
-1.  **Check for Errors:** Identify logic flaws, syntax errors, and potential bugs.
+1.  **Check for Errors:** Identify logic flaws, syntax errors, and potential bugs. 
 2.  **Optimize:** Suggest or implement performance improvements and cleaner code patterns.
-3.  **Update Docs:** Proactively update `README.md` and `PROJECT_STATE.md` to reflect the latest changes or fixes.
+3.  **Update Docs:** Proactively update `README.md` and `PROJECT_STATE.md` to reflect the latest changes or fixes.  **DO THIS FIRST** 
+
+
