@@ -34,7 +34,7 @@
 │   │   ├── pushup.py
 │   │   └── squat.py  # Placeholder for future squat tracking
 │   └── /utils
-│       ├── geometry.py
+│       ├── geometry.py 
 │       └── video_utils.py
 ```
 
