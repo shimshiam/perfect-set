@@ -8,6 +8,7 @@ import useWebSocket from './hooks/useWebSocket.js';
 import VideoFeed from './components/VideoFeed.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import SessionLog from './components/SessionLog.jsx';
+import { initAudio } from './utils/audio.js';
 import './App.css';
 
 export default function App() {
@@ -26,6 +27,12 @@ export default function App() {
 
   const { isConnected, isReconnecting, latestStatus, sendFrame, error: wsError } = useWebSocket(handleRepCompleted, handleRepAborted);
 
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const handleEnableAudio = useCallback(() => {
+    initAudio();
+    setAudioEnabled(true);
+  }, []);
+
   const landmarks = latestStatus?.landmarks ?? null;
 
   return (
@@ -35,6 +42,14 @@ export default function App() {
           <span className="app__title-accent">Perfect</span> Set
         </h1>
         <p className="app__subtitle">Real-Time Physical Form Tracker</p>
+        {!audioEnabled && (
+          <button 
+            onClick={handleEnableAudio} 
+            style={{marginTop: '12px', padding: '10px 20px', background: '#00ff88', color: '#111', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', boxShadow: '0 0 10px rgba(0,255,136,0.3)'}}
+          >
+            🔊 Click to Enable Voice Coaching
+          </button>
+        )}
       </header>
 
       {/* Error banners */}

@@ -12,6 +12,18 @@ function getAudioContext() {
   return audioCtx;
 }
 
+export function initAudio() {
+  const ctx = getAudioContext();
+  if (ctx.state === 'suspended') {
+    ctx.resume();
+  }
+  if ('speechSynthesis' in window) {
+    // Speak empty string to warm up TTS on user interaction
+    const u = new SpeechSynthesisUtterance('');
+    window.speechSynthesis.speak(u);
+  }
+}
+
 export function playDing() {
   const ctx = getAudioContext();
   if (ctx.state === 'suspended') {
