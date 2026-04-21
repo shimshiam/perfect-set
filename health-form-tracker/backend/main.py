@@ -1,8 +1,17 @@
 import cv2
+import ssl
 import time
 from models.pose_detector import PoseDetector
 from heuristics.pushup import PushupTracker
 from utils.video_utils import draw_skeleton, draw_hud, draw_angles
+
+# ── macOS SSL fix ──
+# Python 3.12 on macOS does not trust system certs by default.
+# This allows MediaPipe to download its model weights on first run.
+try:
+    ssl._create_default_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
 
 def main():
     print("Initializing components...")
@@ -16,15 +25,26 @@ def main():
         print("Error: Could not open webcam.")
         return
 
+    # Allow the camera driver to warm up (especially important for Continuity Camera).
+    print("Warming up camera...")
+    for _ in range(10):
+        cap.read()
+
     p_time = 0
+    consecutive_failures = 0
+    MAX_CONSECUTIVE_FAILURES = 10
     print("Starting tracker. Press 'q' in the video window to quit.")
     
     try:
         while True:
             success, img = cap.read()
             if not success:
-                print("Failed to read frame.")
-                break
+                consecutive_failures += 1
+                if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                    print(f"Camera lost after {MAX_CONSECUTIVE_FAILURES} consecutive failures. Exiting.")
+                    break
+                continue
+            consecutive_failures = 0
                 
             # Mirror the image horizontally for a more natural selfie-view
             img = cv2.flip(img, 1)

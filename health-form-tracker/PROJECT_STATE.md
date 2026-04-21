@@ -55,14 +55,14 @@
 * [x] **`backend/models/pose_detector.py`:** `PoseDetector` wrapper for MediaPipe. Upgraded to `model_complexity=2`, raised confidence thresholds to 0.7, and added Exponential Moving Average (EMA) smoothing (`alpha=0.6`) on all landmarks to reduce tracking jitter.
 * [x] **`backend/heuristics/pushup.py`:** State-machine tracker with form-gated rep counting. (Fixed form check overriding bug during UP -> DESCENDING transition).
 * [x] **`backend/utils/video_utils.py`:** Visualization for local OpenCV test suite.
-* [x] **`backend/main.py`:** Local OpenCV test suite.
-* [x] **`backend/server.py`:** FastAPI WebSocket server — verified end-to-end.
+* [x] **`backend/main.py`:** Local OpenCV test suite. Added camera warmup loop and consecutive-failure retry counter (tolerates up to 10 bad frames before exiting). macOS SSL cert fix applied at entry-point.
+* [x] **`backend/server.py`:** FastAPI WebSocket server — verified end-to-end. macOS SSL fix applied at entry-point. Fixed `REP_COMPLETED`/`REP_ABORTED` event ordering: `STATUS` is now sent first so the client receives the correct `rep_count` before the rep event fires.
 * [x] **`frontend/`:** React + Vite app with webcam capture, WebSocket streaming, skeleton overlay, dashboard, and session log. Verified full-stack pipeline.
 * [x] **Audio Feedback:** Real-time synthesized audio cues for counted reps (ding) and form warnings (buzz).
 * [x] **Session Export:** Download complete session logs as JSON with timestamps and form flags.
 
 ### Unresolved Bugs / Known Issues:
-* *(None currently — landmark jitter resolved via EMA smoothing and upgraded model complexity.)*
+* *(None currently — all known issues resolved.)*
 
 ### Immediate Next Steps:
 * **Additional Exercises:** Implement squat tracker using the same state-machine pattern.

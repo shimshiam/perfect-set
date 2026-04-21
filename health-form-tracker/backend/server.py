@@ -13,6 +13,7 @@ import asyncio
 import json
 import base64
 import logging
+import ssl
 import time
 import numpy as np
 import cv2
@@ -22,6 +23,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from models.pose_detector import PoseDetector
 from heuristics.pushup import PushupTracker
+
+# ── macOS SSL fix ──
+# Python 3.12 on macOS does not trust system certs by default.
+# This allows MediaPipe to download its model weights on first run.
+try:
+    ssl._create_default_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -146,14 +155,12 @@ async def pushup_websocket(websocket: WebSocket):
                 landmarks_dict = detector.extract_landmarks(results)
                 status = tracker.process_frame(landmarks_dict)
 
-                if status.pop("rep_completed", False):
-                    await websocket.send_json({"type": "REP_COMPLETED", "count": 1})
-                if status.pop("rep_aborted", False):
-                    await websocket.send_json({"type": "REP_ABORTED", "count": 1})
+                rep_completed = status.pop("rep_completed", False)
+                rep_aborted = status.pop("rep_aborted", False)
 
                 processing_ms = (time.perf_counter() - t_start) * 1000
 
-                # Build response
+                # Build and send STATUS first so client has the updated rep_count
                 response = {
                     "type": "STATUS",
                     **status,
@@ -163,8 +170,13 @@ async def pushup_websocket(websocket: WebSocket):
                     ),
                     "processing_ms": round(processing_ms, 1),
                 }
-
                 await websocket.send_json(response)
+
+                # Send rep events AFTER STATUS so client sees the correct count
+                if rep_completed:
+                    await websocket.send_json({"type": "REP_COMPLETED", "count": status.get("rep_count", 0)})
+                if rep_aborted:
+                    await websocket.send_json({"type": "REP_ABORTED", "count": status.get("rep_count", 0)})
             except Exception as e:
                 logger.error(f"Processing error during core pipeline: {e}")
                 continue
