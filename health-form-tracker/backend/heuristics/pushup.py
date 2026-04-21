@@ -215,12 +215,6 @@ class PushupTracker:
                 self.state = PushupState.UP
                 self._form_maintained = True
 
-        # ── Form evaluation (only active after stabilization) ──
-        if back_angle < self.BACK_TOLERANCE:
-            perfect_form = False
-            warnings.append("Keep your back straight")
-            self._form_maintained = False
-
         # ── State machine: pushup rep counting ──
         if self.state == PushupState.UP:
             if elbow_angle < self.ELBOW_EXTENSION:
@@ -247,6 +241,12 @@ class PushupTracker:
                 self._form_maintained = True
             elif elbow_angle <= self.ELBOW_FLEXION:
                 self.state = PushupState.BOTTOM
+
+        # ── Form evaluation (only active after stabilization) ──
+        if back_angle < self.BACK_TOLERANCE:
+            perfect_form = False
+            warnings.append("Keep your back straight")
+            self._form_maintained = False
 
         return {
             "rep_count": self.rep_count,

@@ -53,7 +53,7 @@
 * [x] **Project Structure:** Full-stack directory with `__init__.py` markers.
 * [x] **`backend/utils/geometry.py`:** `calculate_angle` using vector dot products.
 * [x] **`backend/models/pose_detector.py`:** `PoseDetector` wrapper for MediaPipe.
-* [x] **`backend/heuristics/pushup.py`:** State-machine tracker with form-gated rep counting.
+* [x] **`backend/heuristics/pushup.py`:** State-machine tracker with form-gated rep counting. (Fixed form check overriding bug during UP -> DESCENDING transition).
 * [x] **`backend/utils/video_utils.py`:** Visualization for local OpenCV test suite.
 * [x] **`backend/main.py`:** Local OpenCV test suite.
 * [x] **`backend/server.py`:** FastAPI WebSocket server — verified end-to-end.
