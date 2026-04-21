@@ -9,6 +9,7 @@ Usage:
     uvicorn server:app --reload --host 0.0.0.0 --port 8000
 """
 
+import asyncio
 import json
 import base64
 import logging
@@ -29,9 +30,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("perfect-set")
 
 # ---------------------------------------------------------------------------
-# Connection tracking
+# Connection tracking (asyncio-safe)
 # ---------------------------------------------------------------------------
-active_connections: int = 0
+_connection_count: int = 0
+_connection_lock = asyncio.Lock()
 
 # ---------------------------------------------------------------------------
 # App lifecycle
@@ -68,7 +70,7 @@ async def health_check():
     """Simple liveness probe."""
     return {
         "status": "ok",
-        "active_connections": active_connections,
+        "active_connections": _connection_count,
     }
 
 # ---------------------------------------------------------------------------
@@ -92,10 +94,11 @@ async def pushup_websocket(websocket: WebSocket):
             "processing_ms": float
         }
     """
-    global active_connections
+    global _connection_count
     await websocket.accept()
-    active_connections += 1
-    logger.info(f"Client connected. Active connections: {active_connections}")
+    async with _connection_lock:
+        _connection_count += 1
+    logger.info(f"Client connected. Active connections: {_connection_count}")
 
     # Each connection gets its own stateful instances.
     # MediaPipe Pose is NOT thread-safe, so sharing is not an option.
@@ -136,7 +139,9 @@ async def pushup_websocket(websocket: WebSocket):
                 continue
 
             # --- Core pipeline ---
-            results = detector.find_pose(img)
+            # MediaPipe processing is CPU-bound and synchronous. 
+            # We run it in a separate thread so it doesn't block the main asyncio event loop!
+            results = await asyncio.to_thread(detector.find_pose, img)
             landmarks_dict = detector.extract_landmarks(results)
             status = tracker.process_frame(landmarks_dict)
 
@@ -160,5 +165,6 @@ async def pushup_websocket(websocket: WebSocket):
         logger.error(f"WebSocket error: {e}")
     finally:
         detector.close()
-        active_connections -= 1
-        logger.info(f"Connection closed. Active connections: {active_connections}")
+        async with _connection_lock:
+            _connection_count -= 1
+        logger.info(f"Connection closed. Active connections: {_connection_count}")

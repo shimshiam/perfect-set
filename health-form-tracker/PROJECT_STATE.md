@@ -10,17 +10,29 @@
 ## 2. Project Architecture
 ```text
 /health-form-tracker
-├── /frontend               # React app (next)
+├── /frontend                   # React + Vite app
+│   ├── index.html
+│   └── /src
+│       ├── main.jsx
+│       ├── App.jsx / App.css
+│       ├── index.css           # Design tokens & reset
+│       ├── /hooks
+│       │   ├── useWebcam.js
+│       │   └── useWebSocket.js
+│       ├── /components
+│       │   ├── VideoFeed.jsx/css
+│       │   ├── Dashboard.jsx/css
+│       │   └── SessionLog.jsx/css
+│       └── /utils
+│           └── drawing.js
 ├── /backend
-│   ├── __init__.py         # Package marker
-│   ├── server.py           # FastAPI + WebSocket server
-│   ├── main.py             # Local OpenCV test suite
-│   ├── test_ws.py          # WebSocket integration test
+│   ├── server.py               # FastAPI + WebSocket
+│   ├── main.py                 # Local OpenCV test
 │   ├── /models
 │   │   └── pose_detector.py
 │   ├── /heuristics
 │   │   ├── pushup.py
-│   │   └── squat.py        # Placeholder
+│   │   └── squat.py
 │   └── /utils
 │       ├── geometry.py
 │       └── video_utils.py
@@ -35,25 +47,23 @@
 ## 4. Current State & Progress
 
 ### Completed Modules:
-* [x] **Project Structure:** Directory skeleton with proper `__init__.py` package markers.
-* [x] **`backend/utils/geometry.py`:** Robust `calculate_angle` function using vector dot products.
-* [x] **`backend/models/pose_detector.py`:** `PoseDetector` wrapper for MediaPipe Pose.
+* [x] **Project Structure:** Full-stack directory with `__init__.py` markers.
+* [x] **`backend/utils/geometry.py`:** `calculate_angle` using vector dot products.
+* [x] **`backend/models/pose_detector.py`:** `PoseDetector` wrapper for MediaPipe.
 * [x] **`backend/heuristics/pushup.py`:** State-machine tracker with form-gated rep counting.
-* [x] **`backend/utils/video_utils.py`:** Visualization module for skeleton drawing and HUD overlay.
-* [x] **`backend/main.py`:** Local OpenCV test suite consuming tracker angles directly.
-* [x] **`backend/server.py`:** FastAPI WebSocket server — tested and verified end-to-end.
+* [x] **`backend/utils/video_utils.py`:** Visualization for local OpenCV test suite.
+* [x] **`backend/main.py`:** Local OpenCV test suite.
+* [x] **`backend/server.py`:** FastAPI WebSocket server — verified end-to-end.
+* [x] **`frontend/`:** React + Vite app with webcam capture, WebSocket streaming, skeleton overlay, dashboard, and session log. Verified full-stack pipeline.
 
 ### Unresolved Bugs / Known Issues:
-* **Environment Jitter:** Potential for minor landmark jitter; may need a temporal smoothing buffer in future iterations.
-* *[Fixed]* **HUD Angle Display Bug:** Hardcoded left-side anchoring replaced with dynamic side detection.
-* *[Fixed]* **Bad-Form Reps Counted:** Reps are now form-gated; only counted if back alignment was maintained throughout the full cycle.
-* *[Fixed]* **Redundant Angle Calculation:** `main.py` no longer recalculates angles; consumes them from the tracker's status dict.
-* *[Fixed]* **Missing `__init__.py` Files:** All backend subdirectories now have package markers.
+* **Environment Jitter:** Minor landmark jitter possible; may add temporal smoothing.
 
 ### Immediate Next Steps:
-* **Frontend Development:** Initialize the React + Vite application to consume the WebSocket stream.
-* **Canvas Rendering:** Draw skeleton and HUD on the client side using landmark data from the server.
-* **Session Dashboard:** Build a polished dark-mode UI with rep history, form stats, and live feedback.
+* **Audio Feedback:** Add rep completion sound and form warning beep.
+* **Additional Exercises:** Implement squat tracker using the same state-machine pattern.
+* **Session Persistence:** Save session data to localStorage or a database.
+* **Production Build:** Deploy with HTTPS for secure webcam access on non-localhost.
 
 ## 5. Development Protocols
 

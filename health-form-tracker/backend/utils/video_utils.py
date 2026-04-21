@@ -70,10 +70,12 @@ def draw_hud(img: np.ndarray, status: Dict[str, Any], fps: int):
     hud_w = min(320, w - 20)
     hud_h = min(220, h - 20)
     
-    # Create semi-transparent overlay
-    overlay = img.copy()
-    cv2.rectangle(overlay, (10, 10), (10 + hud_w, 10 + hud_h), (30, 30, 30), -1)
-    cv2.addWeighted(overlay, 0.6, img, 0.4, 0, img)
+    # Semi-transparent overlay using ROI blending (avoids copying the entire frame)
+    x1, y1, x2, y2 = 10, 10, 10 + hud_w, 10 + hud_h
+    roi = img[y1:y2, x1:x2]
+    dark = np.full_like(roi, (30, 30, 30), dtype=np.uint8)
+    cv2.addWeighted(dark, 0.6, roi, 0.4, 0, roi)
+    img[y1:y2, x1:x2] = roi
     
     # Check if we have a person (angles are None when landmarks are missing)
     has_person = status.get('elbow_angle') is not None

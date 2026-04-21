@@ -31,3 +31,31 @@ To test the pushup tracker locally using your webcam:
     python main.py
     ```
 3.  **Usage:** A window will open mirroring your webcam. Perform pushups to see the rep counter and form feedback in real-time. Press **'q'** in the video window to exit.
+
+## Running the WebSocket Server
+
+To serve the tracker as an API for the React frontend:
+
+1.  **Start the server:**
+    ```bash
+    cd health-form-tracker/backend
+    python -m uvicorn server:app --host 0.0.0.0 --port 8000 --reload
+    ```
+2.  **Health check:** Visit `http://localhost:8000/health` to verify the server is running.
+3.  **WebSocket endpoint:** Connect to `ws://localhost:8000/ws/pushups` and send JSON frames:
+    ```json
+    { "frame": "<base64-encoded JPEG>" }
+    ```
+
+## Running the Frontend
+
+1.  **Install dependencies** (first time only):
+    ```bash
+    cd health-form-tracker/frontend
+    npm install
+    ```
+2.  **Start the dev server:**
+    ```bash
+    npm run dev
+    ```
+3.  Open `http://localhost:5173` in your browser. Make sure the backend server is also running.

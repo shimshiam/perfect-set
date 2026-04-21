@@ -1,0 +1,81 @@
+/**
+ * App.css — Layout and chrome styles for the root app shell.
+ */
+
+.app {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+.app__header {
+  margin-bottom: 24px;
+}
+
+.app__title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.app__title-accent {
+  color: var(--accent-green);
+}
+
+.app__subtitle {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 2px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── Errors ── */
+.app__error {
+  background: rgba(255, 51, 85, 0.1);
+  border: 1px solid rgba(255, 51, 85, 0.3);
+  border-radius: var(--radius-sm);
+  color: var(--accent-red);
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+/* ── Main Layout ── */
+.app__main {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.app__sidebar {
+  flex: 1 1 35%;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .app {
+    padding: 16px;
+  }
+
+  .app__main {
+    flex-direction: column;
+  }
+
+  .app__sidebar {
+    min-width: 100%;
+  }
+
+  .app__title {
+    font-size: 1.3rem;
+  }
+}

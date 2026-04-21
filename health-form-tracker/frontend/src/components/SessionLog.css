@@ -1,0 +1,83 @@
+/**
+ * SessionLog.css — Styles for the rep history log.
+ */
+
+.session-log {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  max-height: 240px;
+  display: flex;
+  flex-direction: column;
+}
+
+.session-log__title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 12px;
+}
+
+.session-log__empty {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 20px 0;
+}
+
+.session-log__list {
+  list-style: none;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.session-log__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.session-log__item:last-child {
+  border-bottom: none;
+}
+
+.session-log__rep-number {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 55px;
+}
+
+.session-log__time {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.session-log__form-icon {
+  font-size: 0.7rem;
+  font-weight: 800;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+}
+
+.session-log__form-icon--good {
+  background: rgba(0, 255, 136, 0.15);
+  color: var(--accent-green);
+}
+
+.session-log__form-icon--bad {
+  background: rgba(255, 51, 85, 0.15);
+  color: var(--accent-red);
+}
