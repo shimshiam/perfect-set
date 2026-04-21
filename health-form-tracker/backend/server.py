@@ -139,25 +139,33 @@ async def pushup_websocket(websocket: WebSocket):
                 continue
 
             # --- Core pipeline ---
-            # MediaPipe processing is CPU-bound and synchronous. 
-            # We run it in a separate thread so it doesn't block the main asyncio event loop!
-            results = await asyncio.to_thread(detector.find_pose, img)
-            landmarks_dict = detector.extract_landmarks(results)
-            status = tracker.process_frame(landmarks_dict)
+            try:
+                # MediaPipe processing is CPU-bound and synchronous. 
+                # We run it in a separate thread so it doesn't block the main asyncio event loop!
+                results = await asyncio.to_thread(detector.find_pose, img)
+                landmarks_dict = detector.extract_landmarks(results)
+                status = tracker.process_frame(landmarks_dict)
 
-            processing_ms = (time.perf_counter() - t_start) * 1000
+                if status.pop("rep_completed", False):
+                    await websocket.send_json({"type": "REP_COMPLETED", "count": 1})
 
-            # Build response
-            response = {
-                **status,
-                "landmarks": (
-                    {k: [round(v[0], 4), round(v[1], 4)] for k, v in landmarks_dict.items()}
-                    if landmarks_dict else None
-                ),
-                "processing_ms": round(processing_ms, 1),
-            }
+                processing_ms = (time.perf_counter() - t_start) * 1000
 
-            await websocket.send_json(response)
+                # Build response
+                response = {
+                    "type": "STATUS",
+                    **status,
+                    "landmarks": (
+                        {k: [round(v[0], 4), round(v[1], 4)] for k, v in landmarks_dict.items()}
+                        if landmarks_dict else None
+                    ),
+                    "processing_ms": round(processing_ms, 1),
+                }
+
+                await websocket.send_json(response)
+            except Exception as e:
+                logger.error(f"Processing error during core pipeline: {e}")
+                continue
 
     except WebSocketDisconnect:
         logger.info("Client disconnected normally.")

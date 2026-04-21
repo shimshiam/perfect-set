@@ -7,16 +7,16 @@ import { useRef, useEffect } from 'react';
 import './Dashboard.css';
 import { playDing, playBuzz } from '../utils/audio.js';
 
-export default function Dashboard({ status, isConnected, isReconnecting }) {
+export default function Dashboard({ status, globalReps, isConnected, isReconnecting }) {
   const repRef = useRef(null);
-  const prevRepCount = useRef(0);
+  const prevGlobalReps = useRef(0);
   const prevPerfectForm = useRef(true);
   const prevWarnings = useRef([]);
+  const lastBuzzTime = useRef(0);
 
   // Animate the rep counter on increment and play audio cue
   useEffect(() => {
-    if (!status) return;
-    if (status.rep_count > prevRepCount.current) {
+    if (globalReps > prevGlobalReps.current) {
       const el = repRef.current;
       if (el) {
         el.classList.remove('dashboard__rep-pop');
@@ -26,8 +26,8 @@ export default function Dashboard({ status, isConnected, isReconnecting }) {
       }
       playDing();
     }
-    prevRepCount.current = status.rep_count;
-  }, [status?.rep_count]);
+    prevGlobalReps.current = globalReps;
+  }, [globalReps]);
 
   // Play audio cue for form penalties
   useEffect(() => {
@@ -39,10 +39,19 @@ export default function Dashboard({ status, isConnected, isReconnecting }) {
     const hasAbortedWarning = warnings.includes("Rep not counted: bad form");
     const hadAbortedWarning = prevWarnings.current.includes("Rep not counted: bad form");
     
+    const now = Date.now();
+    const canBuzz = (now - lastBuzzTime.current) > 2000;
+
     if (isActive && !status.perfect_form && prevPerfectForm.current) {
-      playBuzz();
+      if (canBuzz) {
+        playBuzz();
+        lastBuzzTime.current = now;
+      }
     } else if (hasAbortedWarning && !hadAbortedWarning) {
-      playBuzz();
+      if (canBuzz) {
+        playBuzz();
+        lastBuzzTime.current = now;
+      }
     }
     
     prevPerfectForm.current = status.perfect_form;
@@ -50,7 +59,7 @@ export default function Dashboard({ status, isConnected, isReconnecting }) {
   }, [status?.perfect_form, status?.state, status?.elbow_angle, status?.warnings?.join(',')]);
 
   const hasPerson = status?.elbow_angle != null;
-  const repCount = status?.rep_count ?? 0;
+  const repCount = globalReps;
   const phase = status?.state ?? 'PAUSED';
   const perfectForm = status?.perfect_form ?? false;
   const warnings = status?.warnings ?? [];

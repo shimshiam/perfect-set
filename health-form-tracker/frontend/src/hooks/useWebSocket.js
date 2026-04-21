@@ -9,7 +9,7 @@ const WS_URL = 'ws://localhost:8000/ws/pushups';
 const RECONNECT_DELAY_MS = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 
-export default function useWebSocket() {
+export default function useWebSocket(onRepCompleted) {
   const wsRef = useRef(null);
   const reconnectAttempts = useRef(0);
   const reconnectTimer = useRef(null);
@@ -39,7 +39,9 @@ export default function useWebSocket() {
         if (!mountedRef.current) return;
         try {
           const data = JSON.parse(event.data);
-          if (!data.error) {
+          if (data.type === "REP_COMPLETED") {
+            if (onRepCompleted) onRepCompleted();
+          } else if (data.type === "STATUS" || !data.error) {
             setLatestStatus(data);
           }
         } catch {

@@ -5,25 +5,24 @@
 import { useState, useEffect, useRef } from 'react';
 import './SessionLog.css';
 
-export default function SessionLog({ status }) {
+export default function SessionLog({ status, globalReps }) {
   const [reps, setReps] = useState([]);
-  const prevRepCount = useRef(0);
+  const prevGlobalReps = useRef(0);
   const listRef = useRef(null);
 
   useEffect(() => {
-    if (!status) return;
-    if (status.rep_count > prevRepCount.current) {
+    if (globalReps > prevGlobalReps.current) {
       setReps((prev) => [
         {
-          rep: status.rep_count,
+          rep: globalReps,
           timestamp: Date.now(),
-          perfectForm: status.perfect_form,
+          perfectForm: status ? status.perfect_form : true,
         },
         ...prev,
       ]);
+      prevGlobalReps.current = globalReps;
     }
-    prevRepCount.current = status.rep_count;
-  }, [status?.rep_count]);
+  }, [globalReps, status]);
 
   const formatTime = (ts) => {
     const d = new Date(ts);
