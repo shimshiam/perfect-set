@@ -34,6 +34,10 @@ export default function Dashboard({ status, isConnected, isReconnecting }) {
   const backAngle = status?.back_angle;
   const processingMs = status?.processing_ms;
 
+  // Form evaluation is only meaningful during active pushup states
+  const activeStates = ['UP', 'DESCENDING', 'BOTTOM', 'ASCENDING'];
+  const isActive = hasPerson && activeStates.includes(phase);
+
   // Connection status dot
   let dotClass = 'dashboard__dot--disconnected';
   if (isConnected) dotClass = 'dashboard__dot--connected';
@@ -59,17 +63,17 @@ export default function Dashboard({ status, isConnected, isReconnecting }) {
       <div className="dashboard__card">
         <span className="dashboard__label">PHASE</span>
         <span className={`dashboard__phase-badge dashboard__phase-badge--${phase.toLowerCase()}`}>
-          {hasPerson ? phase : 'WAITING'}
+          {hasPerson ? phase : (phase === 'PAUSED' ? 'WAITING' : phase)}
         </span>
       </div>
 
       {/* Form status */}
-      <div className={`dashboard__card dashboard__card--form ${hasPerson ? (perfectForm ? 'dashboard__card--form-good' : 'dashboard__card--form-bad') : ''}`}>
+      <div className={`dashboard__card dashboard__card--form ${isActive ? (perfectForm ? 'dashboard__card--form-good' : 'dashboard__card--form-bad') : ''}`}>
         <span className="dashboard__label">FORM</span>
         <span className="dashboard__form-text">
-          {!hasPerson ? '--' : perfectForm ? 'PERFECT' : 'ADJUST'}
+          {!isActive ? '--' : perfectForm ? 'PERFECT' : 'ADJUST'}
         </span>
-        {warnings.length > 0 && hasPerson && (
+        {warnings.length > 0 && (
           <span className="dashboard__warning">! {warnings[0]}</span>
         )}
       </div>

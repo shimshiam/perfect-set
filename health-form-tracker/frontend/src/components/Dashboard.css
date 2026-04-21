@@ -116,6 +116,15 @@
   background: var(--text-muted);
 }
 
+.dashboard__phase-badge--idle {
+  background: #5566aa;
+}
+
+.dashboard__phase-badge--stabilizing {
+  background: var(--accent-yellow);
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
 /* ── Form Status ── */
 .dashboard__card--form {
   transition: box-shadow 0.3s ease, border-color 0.3s ease;

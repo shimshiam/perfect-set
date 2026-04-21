@@ -39,10 +39,13 @@
 ```
 
 ## 3. Core Mathematical Heuristics (The Pushup Logic)
-* **Rep Counter:** A rep is only counted if the elbow angle (shoulder-elbow-wrist) breaks below 90 degrees on the descent and returns to ~160-180 degrees on the ascent.
-* **Form Gating:** Reps performed with bad form (back angle below 165°) are detected but NOT counted. The user sees "Rep not counted: bad form."
-* **Form Correction:** The back must remain straight. The angle between the shoulder, hip, and ankle must remain approximately 170-180 degrees. If it dips or bows, trigger a form warning.
-* **Angle Calculation:** We calculate the angles of specific joints using the dot product of two vectors derived from (x, y) coordinates. 
+* **Rep Counter:** A rep is only counted if the elbow angle breaks below 90deg on descent and returns to 160deg+ on ascent.
+* **Form Gating:** Reps with bad form (back angle < 165deg) are detected but NOT counted.
+* **Orientation Gate:** Compares shoulder Y vs ankle Y. If the person is standing upright, rep counting is locked (prevents "standing pushup" false positives).
+* **Stabilization Gate:** Requires 30 frames (~2s) of continuous horizontal posture before form checking activates (prevents false "bad form" during transition to floor).
+* **Proximity Gate:** If shoulder-to-shoulder x-distance exceeds 35% of frame width, tracking pauses with "Step back" warning (prevents depth distortion false reps).
+* **Debounce:** Requires 15 consecutive frames without landmarks before dropping to PAUSED (prevents UI flickering).
+* **State Machine:** PAUSED → IDLE → STABILIZING → UP → DESCENDING → BOTTOM → ASCENDING → UP (rep counted).
 
 ## 4. Current State & Progress
 
