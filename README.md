@@ -41,10 +41,10 @@ To serve the tracker as an API for the React frontend:
 1.  **Start the server:**
     ```bash
     cd health-form-tracker/backend
-    python -m uvicorn server:app --host 0.0.0.0 --port 8000 --reload
+    python -m uvicorn server:app --host [IP_ADDRESS] --port 8000 --reload
     ```
-2.  **Health check:** Visit `http://localhost:8000/health` to verify the server is running.
-3.  **WebSocket endpoint:** Connect to `ws://localhost:8000/ws/pushups` and send JSON frames:
+2.  **Health check:** Visit `http://[IP_ADDRESS]/health` to verify the server is running.
+3.  **WebSocket endpoint:** Connect to `ws://[IP_ADDRESS]/ws/pushups` and send JSON frames:
     ```json
     { "frame": "<base64-encoded JPEG>" }
     ```
