@@ -3,6 +3,8 @@ import mediapipe as mp
 import numpy as np
 from typing import Optional, Dict, Any, Tuple
 
+from utils.ssl_utils import mediapipe_ssl_context
+
 class PoseDetector:
     """
     A wrapper class for initializing and using the MediaPipe Pose model.
@@ -24,15 +26,16 @@ class PoseDetector:
             smoothing_alpha: 0.0 to 1.0. Lower = smoother but more lag. Higher = more responsive but jittery.
         """
         self.mp_pose = mp.solutions.pose
-        self.pose = self.mp_pose.Pose(
-            static_image_mode=static_image_mode,
-            model_complexity=model_complexity,
-            smooth_landmarks=smooth_landmarks,
-            enable_segmentation=enable_segmentation,
-            smooth_segmentation=smooth_segmentation,
-            min_detection_confidence=min_detection_confidence,
-            min_tracking_confidence=min_tracking_confidence
-        )
+        with mediapipe_ssl_context():
+            self.pose = self.mp_pose.Pose(
+                static_image_mode=static_image_mode,
+                model_complexity=model_complexity,
+                smooth_landmarks=smooth_landmarks,
+                enable_segmentation=enable_segmentation,
+                smooth_segmentation=smooth_segmentation,
+                min_detection_confidence=min_detection_confidence,
+                min_tracking_confidence=min_tracking_confidence
+            )
         self.alpha = smoothing_alpha
         self.prev_landmarks: Dict[str, Tuple[float, float]] = {}
         

@@ -11,59 +11,40 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 
 export default function useWebSocket(onRepCompleted, onRepAborted) {
   const wsRef = useRef(null);
+  const connectRef = useRef(() => {});
   const reconnectAttempts = useRef(0);
   const reconnectTimer = useRef(null);
   const mountedRef = useRef(true);
+  const frameInFlightRef = useRef(false);
+  const queuedFrameRef = useRef(null);
 
   const [isConnected, setIsConnected] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [latestStatus, setLatestStatus] = useState(null);
   const [error, setError] = useState(null);
 
-  const connect = useCallback(() => {
-    if (!mountedRef.current) return;
+  const flushQueuedFrame = useCallback(() => {
+    const ws = wsRef.current;
+    const queuedFrame = queuedFrameRef.current;
 
-    try {
-      const ws = new WebSocket(WS_URL);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        if (!mountedRef.current) return;
-        setIsConnected(true);
-        setIsReconnecting(false);
-        setError(null);
-        reconnectAttempts.current = 0;
-      };
-
-      ws.onmessage = (event) => {
-        if (!mountedRef.current) return;
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === "REP_COMPLETED") {
-            if (onRepCompleted) onRepCompleted();
-          } else if (data.type === "REP_ABORTED") {
-            if (onRepAborted) onRepAborted();
-          } else if (data.type === "STATUS" || !data.error) {
-            setLatestStatus(data);
-          }
-        } catch {
-          // Ignore malformed messages
-        }
-      };
-
-      ws.onclose = () => {
-        if (!mountedRef.current) return;
-        setIsConnected(false);
-        wsRef.current = null;
-        attemptReconnect();
-      };
-
-      ws.onerror = () => {
-        // onclose will fire after onerror — reconnection handled there
-      };
-    } catch {
-      attemptReconnect();
+    if (!ws || ws.readyState !== WebSocket.OPEN || !queuedFrame) {
+      return false;
     }
+
+    queuedFrameRef.current = null;
+    frameInFlightRef.current = true;
+    ws.send(JSON.stringify({ frame: queuedFrame }));
+    return true;
+  }, []);
+
+  const releaseFrameSlot = useCallback(() => {
+    frameInFlightRef.current = false;
+    flushQueuedFrame();
+  }, [flushQueuedFrame]);
+
+  const resetFrameQueue = useCallback(() => {
+    frameInFlightRef.current = false;
+    queuedFrameRef.current = null;
   }, []);
 
   const attemptReconnect = useCallback(() => {
@@ -78,8 +59,76 @@ export default function useWebSocket(onRepCompleted, onRepAborted) {
     reconnectAttempts.current += 1;
 
     reconnectTimer.current = setTimeout(() => {
-      if (mountedRef.current) connect();
+      if (mountedRef.current) connectRef.current();
     }, RECONNECT_DELAY_MS);
+  }, []);
+
+  const connect = useCallback(() => {
+    if (!mountedRef.current) return;
+
+    try {
+      const ws = new WebSocket(WS_URL);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        if (!mountedRef.current) return;
+        setIsConnected(true);
+        setIsReconnecting(false);
+        setError(null);
+        reconnectAttempts.current = 0;
+        resetFrameQueue();
+      };
+
+      ws.onmessage = (event) => {
+        if (!mountedRef.current) return;
+        try {
+          const data = JSON.parse(event.data);
+
+          if (data.type === 'STATUS') {
+            setLatestStatus(data);
+            setError(null);
+            releaseFrameSlot();
+            return;
+          }
+
+          if (data.type === "REP_COMPLETED") {
+            if (onRepCompleted) onRepCompleted();
+            return;
+          }
+
+          if (data.type === "REP_ABORTED") {
+            if (onRepAborted) onRepAborted();
+            return;
+          }
+
+          if (data.error) {
+            setError(data.error);
+            releaseFrameSlot();
+          }
+        } catch {
+          // Ignore malformed messages
+        }
+      };
+
+      ws.onclose = () => {
+        if (!mountedRef.current) return;
+        setIsConnected(false);
+        wsRef.current = null;
+        resetFrameQueue();
+        attemptReconnect();
+      };
+
+      ws.onerror = () => {
+        // onclose will fire after onerror — reconnection handled there
+      };
+    } catch {
+      resetFrameQueue();
+      attemptReconnect();
+    }
+  }, [attemptReconnect, onRepAborted, onRepCompleted, releaseFrameSlot, resetFrameQueue]);
+
+  useEffect(() => {
+    connectRef.current = connect;
   }, [connect]);
 
   useEffect(() => {
@@ -99,9 +148,19 @@ export default function useWebSocket(onRepCompleted, onRepAborted) {
 
   const sendFrame = useCallback((base64Frame) => {
     const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ frame: base64Frame }));
+
+    if (!ws || ws.readyState !== WebSocket.OPEN || !base64Frame) {
+      return false;
     }
+
+    if (frameInFlightRef.current) {
+      queuedFrameRef.current = base64Frame;
+      return false;
+    }
+
+    frameInFlightRef.current = true;
+    ws.send(JSON.stringify({ frame: base64Frame }));
+    return true;
   }, []);
 
   return { isConnected, isReconnecting, latestStatus, sendFrame, error };

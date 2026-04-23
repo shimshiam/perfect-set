@@ -13,8 +13,6 @@ import asyncio
 import json
 import base64
 import logging
-import ssl
-import sys
 import time
 import numpy as np
 import cv2
@@ -24,16 +22,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from models.pose_detector import PoseDetector
 from heuristics.pushup import PushupTracker
-
-# ── macOS SSL fix ──
-# Python 3.12 on macOS does not bundle root certs, causing MediaPipe's model
-# download to fail. Intentionally gated to darwin only so Windows/Linux users
-# retain full SSL certificate verification.
-if sys.platform == 'darwin':
-    try:
-        ssl._create_default_https_context = ssl._create_unverified_context
-    except AttributeError:
-        pass
 
 # ---------------------------------------------------------------------------
 # Logging
