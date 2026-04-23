@@ -1,16 +1,30 @@
-# React + Vite
+# Perfect Set Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite client for the Perfect Set physical form tracker. The frontend captures webcam frames, streams them to the FastAPI backend over WebSocket, renders the pose overlay, and keeps the current session in browser `localStorage`.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Webcam capture with a mirrored local preview
+- Real-time pushup status updates over WebSocket
+- Skeleton overlay and dashboard telemetry
+- Persistent session history with JSON export
+- Audio cues for completed reps and form warnings
 
-## React Compiler
+## Development
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Install dependencies and start the Vite dev server:
 
-## Expanding the ESLint configuration
+```bash
+npm install
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+The app expects the backend WebSocket server at `ws://localhost:8000/ws/pushups`.
+
+## Session Storage
+
+Session state is stored locally in the browser under `perfect-set/session/v1`. Reloading the page restores:
+
+- completed rep count
+- aborted rep count
+- session event history used by the log and export flow

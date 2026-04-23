@@ -9,6 +9,11 @@ import './VideoFeed.css';
 export default function VideoFeed({ videoRef, captureFrame, isReady, sendFrame, isConnected, landmarks }) {
   const canvasRef = useRef(null);
   const intervalRef = useRef(null);
+  const landmarksRef = useRef(landmarks);
+
+  useEffect(() => {
+    landmarksRef.current = landmarks;
+  }, [landmarks]);
 
   // Frame capture loop — throttled to ~15 FPS
   useEffect(() => {
@@ -36,14 +41,14 @@ export default function VideoFeed({ videoRef, captureFrame, isReady, sendFrame, 
 
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawSkeleton(ctx, landmarks, canvas.width, canvas.height);
+        drawSkeleton(ctx, landmarksRef.current, canvas.width, canvas.height);
       }
       animId = requestAnimationFrame(draw);
     };
 
     draw();
     return () => cancelAnimationFrame(animId);
-  }, [landmarks, videoRef]);
+  }, [videoRef]);
 
   return (
     <section className="video-feed" aria-label="Webcam feed with pose overlay">

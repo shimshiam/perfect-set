@@ -1,28 +1,61 @@
 /**
  * App.jsx — Root component for Perfect Set.
- * Orchestrates webcam capture, WebSocket streaming, and UI rendering.
+ * Orchestrates webcam capture, WebSocket streaming, persisted session state,
+ * and UI rendering.
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import useWebcam from './hooks/useWebcam.js';
 import useWebSocket from './hooks/useWebSocket.js';
 import VideoFeed from './components/VideoFeed.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import SessionLog from './components/SessionLog.jsx';
 import { initAudio } from './utils/audio.js';
+import { createEmptySession, loadSession, saveSession } from './utils/sessionStorage.js';
 import './App.css';
 
 export default function App() {
   const { videoRef, captureFrame, isReady, error: camError } = useWebcam();
-  
-  const [globalReps, setGlobalReps] = useState(0);
-  const [globalAbortedReps, setGlobalAbortedReps] = useState(0);
+
+  const [session, setSession] = useState(() => loadSession());
+
+  useEffect(() => {
+    saveSession(session);
+  }, [session]);
 
   const handleRepCompleted = useCallback(() => {
-    setGlobalReps((prev) => prev + 1);
+    setSession((prev) => {
+      const nextAttempt = prev.completedReps + prev.abortedReps + 1;
+      return {
+        completedReps: prev.completedReps + 1,
+        abortedReps: prev.abortedReps,
+        events: [
+          {
+            attempt: nextAttempt,
+            timestamp: Date.now(),
+            perfectForm: true,
+          },
+          ...prev.events,
+        ],
+      };
+    });
   }, []);
 
   const handleRepAborted = useCallback(() => {
-    setGlobalAbortedReps((prev) => prev + 1);
+    setSession((prev) => {
+      const nextAttempt = prev.completedReps + prev.abortedReps + 1;
+      return {
+        completedReps: prev.completedReps,
+        abortedReps: prev.abortedReps + 1,
+        events: [
+          {
+            attempt: nextAttempt,
+            timestamp: Date.now(),
+            perfectForm: false,
+          },
+          ...prev.events,
+        ],
+      };
+    });
   }, []);
 
   const { isConnected, isReconnecting, latestStatus, sendFrame, error: wsError } = useWebSocket(handleRepCompleted, handleRepAborted);
@@ -34,6 +67,8 @@ export default function App() {
   }, []);
 
   const landmarks = latestStatus?.landmarks ?? null;
+  const globalReps = session.completedReps;
+  const globalAbortedReps = session.abortedReps;
 
   return (
     <div className="app">
@@ -77,7 +112,12 @@ export default function App() {
             isConnected={isConnected}
             isReconnecting={isReconnecting}
           />
-          <SessionLog status={latestStatus} globalReps={globalReps} globalAbortedReps={globalAbortedReps} />
+          <SessionLog
+            entries={session.events}
+            onResetSession={() => setSession(createEmptySession())}
+            globalReps={globalReps}
+            globalAbortedReps={globalAbortedReps}
+          />
         </div>
       </main>
     </div>
