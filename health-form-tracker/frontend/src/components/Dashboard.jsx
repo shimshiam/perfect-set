@@ -13,6 +13,10 @@ export default function Dashboard({ status, globalReps, isConnected, isReconnect
   const prevPerfectForm = useRef(true);
   const prevWarnings = useRef([]);
   const lastBuzzTime = useRef(0);
+  const statusState = status?.state ?? null;
+  const statusElbowAngle = status?.elbow_angle ?? null;
+  const statusPerfectForm = status?.perfect_form ?? true;
+  const statusWarnings = status?.warnings;
 
   // Animate the rep counter on increment and play audio cue
   useEffect(() => {
@@ -34,8 +38,8 @@ export default function Dashboard({ status, globalReps, isConnected, isReconnect
   useEffect(() => {
     if (!status) return;
     const activeStates = ['UP', 'DESCENDING', 'BOTTOM', 'ASCENDING'];
-    const isActive = status.elbow_angle != null && activeStates.includes(status.state);
-    const warnings = status.warnings || [];
+    const isActive = statusElbowAngle != null && activeStates.includes(statusState);
+    const warnings = statusWarnings ?? [];
     
     const hasAbortedWarning = warnings.includes("Rep not counted: bad form");
     const hadAbortedWarning = prevWarnings.current.includes("Rep not counted: bad form");
@@ -59,9 +63,9 @@ export default function Dashboard({ status, globalReps, isConnected, isReconnect
       }
     }
     
-    prevPerfectForm.current = status.perfect_form;
+    prevPerfectForm.current = statusPerfectForm;
     prevWarnings.current = warnings;
-  }, [status?.perfect_form, status?.state, status?.elbow_angle, status?.warnings?.join(',')]);
+  }, [status, statusElbowAngle, statusPerfectForm, statusState, statusWarnings]);
 
   const hasPerson = status?.elbow_angle != null;
   const repCount = globalReps;

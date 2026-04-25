@@ -244,8 +244,8 @@ class PushupTracker:
                     rep_aborted = True
                 self._form_maintained = True
             elif elbow_angle <= self.ELBOW_FLEXION:
-                # Rep cut short — reset form flag so the new attempt starts clean
-                self._form_maintained = True
+                # A bounce returns to BOTTOM inside the same rep cycle, so preserve
+                # any prior bad-form history until the rep either aborts or finishes.
                 self.state = PushupState.BOTTOM
 
         # ── Form evaluation (only active after stabilization) ──

@@ -24,7 +24,8 @@
 │       │   ├── Dashboard.jsx/css
 │       │   └── SessionLog.jsx/css
 │       └── /utils
-│           └── drawing.js
+│           ├── drawing.js
+│           └── sessionStorage.js
 ├── /backend
 │   ├── server.py               # FastAPI + WebSocket
 │   ├── main.py                 # Local OpenCV test
@@ -33,8 +34,12 @@
 │   ├── /heuristics
 │   │   ├── pushup.py
 │   │   └── squat.py  # Placeholder for future squat tracking
+│   ├── /tests
+│   │   ├── test_pushup.py
+│   │   └── test_server.py
 │   └── /utils
-│       ├── geometry.py 
+│       ├── geometry.py
+│       ├── ssl_utils.py
 │       └── video_utils.py
 ```
 
@@ -52,21 +57,23 @@
 ### Completed Modules:
 * [x] **Project Structure:** Full-stack directory with `__init__.py` markers.
 * [x] **`backend/utils/geometry.py`:** `calculate_angle` using vector dot products.
-* [x] **`backend/models/pose_detector.py`:** `PoseDetector` wrapper for MediaPipe. Upgraded to `model_complexity=2`, raised confidence thresholds to 0.7, and added Exponential Moving Average (EMA) smoothing (`alpha=0.6`) on all landmarks to reduce tracking jitter.
-* [x] **`backend/heuristics/pushup.py`:** State-machine tracker with form-gated rep counting. Fixed `_form_maintained` not being reset when ASCENDING is cut short back to BOTTOM, which would incorrectly reject the next clean rep. Cleaned up legacy FIX 1/2/3/4 scaffolding comment labels.
+* [x] **`backend/utils/ssl_utils.py`:** Centralizes the macOS MediaPipe certificate workaround. Detector initialization now uses a scoped HTTPS context backed by `certifi`, with an opt-out env var (`PERFECT_SET_DISABLE_MEDIAPIPE_SSL_WORKAROUND=1`) instead of a process-wide import-time override.
+* [x] **`backend/models/pose_detector.py`:** `PoseDetector` wrapper for MediaPipe. Upgraded to `model_complexity=2`, raised confidence thresholds to 0.7, added Exponential Moving Average (EMA) smoothing (`alpha=0.6`) on all landmarks to reduce tracking jitter, and moved macOS certificate handling into the scoped SSL helper used only during `Pose()` initialization.
+* [x] **`backend/heuristics/pushup.py`:** State-machine tracker with form-gated rep counting. Bad-form history now stays sticky through ASCENDING→BOTTOM bounces so a rep that already broke form cannot become countable again mid-cycle.
 * [x] **`backend/utils/video_utils.py`:** Visualization for local OpenCV test suite. Fixed `draw_angles` to resolve the best visible landmark side independently per joint (elbow vs. hip), preventing silent rendering miss.
-* [x] **`backend/main.py`:** Local OpenCV test suite. Added camera warmup loop and consecutive-failure retry counter (tolerates up to 10 bad frames before exiting). macOS SSL cert fix applied at entry-point.
-* [x] **`backend/server.py`:** FastAPI WebSocket server — verified end-to-end. macOS SSL fix applied at entry-point (darwin-gated). Fixed `REP_COMPLETED`/`REP_ABORTED` event ordering. Fixed full pipeline (`find_pose` + `extract_landmarks`) to run in `asyncio.to_thread` so the event loop is never blocked. `rep_count` captured before status mutation for reliable event delivery.
-* [x] **`frontend/`:** React + Vite app with webcam capture, WebSocket streaming, skeleton overlay, dashboard, and session log. Verified full-stack pipeline.
+* [x] **`backend/main.py`:** Local OpenCV test suite. Added camera warmup loop and consecutive-failure retry counter (tolerates up to 10 bad frames before exiting). SSL setup is now inherited through `PoseDetector` instead of duplicated at the entry-point.
+* [x] **`backend/server.py`:** FastAPI WebSocket server. Fixed `REP_COMPLETED`/`REP_ABORTED` event ordering. The full pose pipeline now runs in `asyncio.to_thread` via a synchronous callable so the event loop stays responsive and the worker thread returns actual landmarks, not a coroutine. `rep_count` is captured before status mutation for reliable event delivery.
+* [x] **`backend/tests/`:** Added automated `unittest` regression coverage for stabilization gating, debounced landmark loss, bad-form bounce handling, and WebSocket message ordering / synchronous pipeline execution.
+* [x] **`frontend/`:** React + Vite app with webcam capture, WebSocket streaming, skeleton overlay, dashboard, and session log. Session history and rep counters persist in `localStorage`, survive refresh, and still export as JSON. Frame upload now uses one-frame-in-flight backpressure with a latest-frame queue, and the overlay canvas only resizes when the video dimensions actually change.
 * [x] **Audio Feedback:** Real-time synthesized audio cues for counted reps (ding) and form warnings (buzz).
 * [x] **Session Export:** Download complete session logs as JSON with timestamps and form flags.
 
 ### Unresolved Bugs / Known Issues:
-* *(None currently — all known issues resolved.)*
+* No new correctness regressions were found in the first safety batch after automated validation on 2026-04-23.
 
 ### Immediate Next Steps:
 * **Additional Exercises:** Implement squat tracker using the same state-machine pattern.
-* **Session Persistence:** Save session data to localStorage or a database.
+* **Session Expansion:** Extend the persisted session model for multi-exercise support once squat tracking lands.
 * **Production Build:** Deploy with HTTPS for secure webcam access on non-localhost.
 
 ## 5. Development Protocols
@@ -76,5 +83,3 @@ Whenever the user requests a code review, the AI must:
 1.  **Check for Errors:** Identify logic flaws, syntax errors, and potential bugs. 
 2.  **Optimize:** Suggest or implement performance improvements and cleaner code patterns.
 3.  **Update Docs:** Proactively update `README.md` and `PROJECT_STATE.md` to reflect the latest changes or fixes.  **DO THIS FIRST** 
-
-
