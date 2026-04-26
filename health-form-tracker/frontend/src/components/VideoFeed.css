@@ -1,0 +1,52 @@
+/**
+ * VideoFeed.css — Styles for the webcam feed and canvas overlay.
+ */
+
+.video-feed {
+  flex: 1 1 60%;
+  min-width: 300px;
+}
+
+.video-feed__container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+}
+
+.video-feed__video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.video-feed__canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform: scaleX(1); /* Landmarks are already x-flipped in drawing.js */
+  pointer-events: none;
+}
+
+.video-feed__loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 15, 0.85);
+}
+
+.video-feed__loading-text {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}

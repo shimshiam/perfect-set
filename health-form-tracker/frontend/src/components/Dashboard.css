@@ -1,0 +1,198 @@
+/**
+ * Dashboard.css — Styles for the workout stats panel.
+ */
+
+.dashboard {
+  flex: 1 1 35%;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Connection ── */
+.dashboard__connection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.dashboard__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-round);
+  flex-shrink: 0;
+}
+
+.dashboard__dot--connected {
+  background: var(--accent-green);
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.4);
+}
+
+.dashboard__dot--reconnecting {
+  background: var(--accent-yellow);
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+.dashboard__dot--disconnected {
+  background: var(--accent-red);
+}
+
+.dashboard__connection-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Cards ── */
+.dashboard__card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.dashboard__label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 6px;
+}
+
+/* ── Rep Count ── */
+.dashboard__card--reps {
+  text-align: center;
+  padding: 20px;
+}
+
+.dashboard__rep-count {
+  display: block;
+  font-size: 4rem;
+  font-weight: 800;
+  color: var(--accent-green);
+  line-height: 1;
+  margin-top: 4px;
+}
+
+.dashboard__rep-pop {
+  animation: rep-pop 300ms ease-out;
+}
+
+/* ── Phase Badge ── */
+.dashboard__phase-badge {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--bg-primary);
+  background: var(--accent-yellow);
+  transition: background-color 0.3s ease;
+}
+
+.dashboard__phase-badge--up {
+  background: var(--accent-green);
+}
+
+.dashboard__phase-badge--bottom {
+  background: var(--accent-orange);
+}
+
+.dashboard__phase-badge--ascending,
+.dashboard__phase-badge--descending {
+  background: var(--accent-cyan);
+}
+
+.dashboard__phase-badge--paused,
+.dashboard__phase-badge--waiting {
+  background: var(--text-muted);
+}
+
+.dashboard__phase-badge--idle {
+  background: #5566aa;
+}
+
+.dashboard__phase-badge--stabilizing {
+  background: var(--accent-yellow);
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* ── Form Status ── */
+.dashboard__card--form {
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.dashboard__card--form-good {
+  border-color: rgba(0, 255, 136, 0.2);
+  animation: pulse-green 2s ease-in-out infinite;
+}
+
+.dashboard__card--form-bad {
+  border-color: rgba(255, 51, 85, 0.3);
+  animation: pulse-red 1.2s ease-in-out infinite;
+}
+
+.dashboard__form-text {
+  display: block;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.dashboard__card--form-good .dashboard__form-text {
+  color: var(--accent-green);
+}
+
+.dashboard__card--form-bad .dashboard__form-text {
+  color: var(--accent-red);
+}
+
+.dashboard__warning {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent-red);
+}
+
+/* ── Angles ── */
+.dashboard__angles {
+  display: flex;
+  gap: 12px;
+}
+
+.dashboard__card--small {
+  flex: 1;
+  text-align: center;
+}
+
+.dashboard__angle-value {
+  display: block;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+/* ── Latency ── */
+.dashboard__latency {
+  text-align: right;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  padding: 4px 0;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .dashboard {
+    min-width: 100%;
+  }
+}
