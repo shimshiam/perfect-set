@@ -45,7 +45,7 @@
 
 ## 3. Core Mathematical Heuristics (The Pushup Logic)
 * **Rep Counter:** A rep is only counted if the elbow angle breaks below 90deg on descent and returns to 160deg+ on ascent.
-* **Form Gating:** Reps with bad form (back angle < 140deg) are detected but NOT counted.
+* **Form Gating:** Reps with sustained bad form (back angle < 140deg for 3 consecutive active frames) are detected but NOT counted. The warning only clears after the back recovers above 145deg, reducing jitter-induced flicker.
 * **Orientation Gate:** Compares shoulder Y vs ankle Y. If the person is standing upright, rep counting is locked (prevents "standing pushup" false positives).
 * **Stabilization Gate:** Requires 30 frames (~2s) of continuous horizontal posture before form checking activates (prevents false "bad form" during transition to floor).
 * **Proximity Gate:** If shoulder-to-shoulder x-distance exceeds 35% of frame width, tracking pauses with "Step back" warning (prevents depth distortion false reps).
@@ -59,7 +59,7 @@
 * [x] **`backend/utils/geometry.py`:** `calculate_angle` using vector dot products.
 * [x] **`backend/utils/ssl_utils.py`:** Centralizes the macOS MediaPipe certificate workaround. Detector initialization now uses a scoped HTTPS context backed by `certifi`, with an opt-out env var (`PERFECT_SET_DISABLE_MEDIAPIPE_SSL_WORKAROUND=1`) instead of a process-wide import-time override.
 * [x] **`backend/models/pose_detector.py`:** `PoseDetector` wrapper for MediaPipe. Upgraded to `model_complexity=2`, raised confidence thresholds to 0.7, added Exponential Moving Average (EMA) smoothing (`alpha=0.6`) on all landmarks to reduce tracking jitter, and moved macOS certificate handling into the scoped SSL helper used only during `Pose()` initialization.
-* [x] **`backend/heuristics/pushup.py`:** State-machine tracker with form-gated rep counting. Bad-form history now stays sticky through ASCENDING→BOTTOM bounces so a rep that already broke form cannot become countable again mid-cycle.
+* [x] **`backend/heuristics/pushup.py`:** State-machine tracker with form-gated rep counting. Bad-form history now stays sticky through ASCENDING→BOTTOM bounces so a rep that already broke form cannot become countable again mid-cycle. Back-form warnings now require 3 consecutive below-threshold frames and clear with hysteresis after recovery above 145deg, which reduces false positives from pose jitter. Rep completion is also evaluated after the final back-form check so a noisy last frame cannot be counted before being rejected.
 * [x] **`backend/utils/video_utils.py`:** Visualization for local OpenCV test suite. Fixed `draw_angles` to resolve the best visible landmark side independently per joint (elbow vs. hip), preventing silent rendering miss.
 * [x] **`backend/main.py`:** Local OpenCV test suite. Added camera warmup loop and consecutive-failure retry counter (tolerates up to 10 bad frames before exiting). SSL setup is now inherited through `PoseDetector` instead of duplicated at the entry-point.
 * [x] **`backend/server.py`:** FastAPI WebSocket server. Fixed `REP_COMPLETED`/`REP_ABORTED` event ordering. The full pose pipeline now runs in `asyncio.to_thread` via a synchronous callable so the event loop stays responsive and the worker thread returns actual landmarks, not a coroutine. `rep_count` is captured before status mutation for reliable event delivery.

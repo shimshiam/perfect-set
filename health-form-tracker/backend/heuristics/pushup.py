@@ -29,6 +29,8 @@ class PushupTracker:
     ELBOW_FLEXION = 90.0
     ELBOW_EXTENSION = 160.0
     BACK_TOLERANCE = 140.0
+    BACK_RECOVERY_TOLERANCE = 145.0
+    BACK_BAD_FRAME_GRACE = 3
 
     # ── Orientation Gate ──
     # Max |avg_shoulder_y - avg_ankle_y| to be considered horizontal.
@@ -56,6 +58,8 @@ class PushupTracker:
         self._form_maintained = True
         self._stabilize_counter = 0
         self._landmark_loss_counter = 0
+        self._bad_back_frame_counter = 0
+        self._back_form_bad = False
 
     # ──────────────────────────────────────────────────────────────
     # Helper methods
@@ -81,6 +85,29 @@ class PushupTracker:
             x_gap = abs(lm['left_shoulder'][0] - lm['right_shoulder'][0])
             return x_gap > self.PROXIMITY_THRESHOLD
         return False
+
+    def _reset_back_form_tracking(self) -> None:
+        self._bad_back_frame_counter = 0
+        self._back_form_bad = False
+
+    def _evaluate_back_form(self, back_angle: float, warnings: List[str]) -> bool:
+        if back_angle < self.BACK_TOLERANCE:
+            self._bad_back_frame_counter += 1
+        else:
+            self._bad_back_frame_counter = 0
+
+        if self._back_form_bad:
+            if back_angle >= self.BACK_RECOVERY_TOLERANCE:
+                self._back_form_bad = False
+        elif self._bad_back_frame_counter >= self.BACK_BAD_FRAME_GRACE:
+            self._back_form_bad = True
+
+        if self._back_form_bad:
+            warnings.append("Keep your back straight")
+            self._form_maintained = False
+            return False
+
+        return True
 
     # ──────────────────────────────────────────────────────────────
     # Main processing loop
@@ -113,6 +140,8 @@ class PushupTracker:
             if self._landmark_loss_counter >= self.DEBOUNCE_FRAMES:
                 self.state = PushupState.PAUSED
                 self._stabilize_counter = 0
+                self._form_maintained = True
+                self._reset_back_form_tracking()
             # During debounce: keep self.state as last known value.
             # After debounce: state is PAUSED.
             return {
@@ -183,6 +212,7 @@ class PushupTracker:
             self.state = PushupState.IDLE
             self._stabilize_counter = 0
             self._form_maintained = True
+            self._reset_back_form_tracking()
             return {
                 "rep_count": self.rep_count,
                 "rep_completed": False,
@@ -202,6 +232,7 @@ class PushupTracker:
             self._stabilize_counter += 1
             if self._stabilize_counter < self.STABILIZE_FRAMES:
                 self.state = PushupState.STABILIZING
+                self._reset_back_form_tracking()
                 return {
                     "rep_count": self.rep_count,
                     "rep_completed": False,
@@ -216,8 +247,10 @@ class PushupTracker:
                 # Stabilized — enter active tracking
                 self.state = PushupState.UP
                 self._form_maintained = True
+                self._reset_back_form_tracking()
 
         # ── State machine: pushup rep counting ──
+        finalize_rep = False
         if self.state == PushupState.UP:
             if elbow_angle < self.ELBOW_EXTENSION:
                 self.state = PushupState.DESCENDING
@@ -236,23 +269,24 @@ class PushupTracker:
         elif self.state == PushupState.ASCENDING:
             if elbow_angle >= self.ELBOW_EXTENSION:
                 self.state = PushupState.UP
-                if self._form_maintained:
-                    self.rep_count += 1
-                    rep_completed = True
-                else:
-                    warnings.append("Rep not counted: bad form")
-                    rep_aborted = True
-                self._form_maintained = True
+                finalize_rep = True
             elif elbow_angle <= self.ELBOW_FLEXION:
                 # A bounce returns to BOTTOM inside the same rep cycle, so preserve
                 # any prior bad-form history until the rep either aborts or finishes.
                 self.state = PushupState.BOTTOM
 
         # ── Form evaluation (only active after stabilization) ──
-        if back_angle < self.BACK_TOLERANCE:
+        if not self._evaluate_back_form(back_angle, warnings):
             perfect_form = False
-            warnings.append("Keep your back straight")
-            self._form_maintained = False
+
+        if finalize_rep:
+            if self._form_maintained:
+                self.rep_count += 1
+                rep_completed = True
+            else:
+                warnings.append("Rep not counted: bad form")
+                rep_aborted = True
+            self._form_maintained = True
 
         return {
             "rep_count": self.rep_count,

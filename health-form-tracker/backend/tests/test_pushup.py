@@ -61,7 +61,8 @@ class PushupTrackerTests(unittest.TestCase):
         tracker = PushupTracker()
         self._stabilize_tracker(tracker)
 
-        self._run_frame(tracker, elbow_angle=120.0, back_angle=130.0)
+        for _ in range(tracker.BACK_BAD_FRAME_GRACE):
+            self._run_frame(tracker, elbow_angle=120.0, back_angle=130.0)
         self._run_frame(tracker, elbow_angle=85.0, back_angle=130.0)
         self._run_frame(tracker, elbow_angle=120.0, back_angle=150.0)
         bounce = self._run_frame(tracker, elbow_angle=85.0, back_angle=150.0)
@@ -73,6 +74,37 @@ class PushupTrackerTests(unittest.TestCase):
         self.assertEqual(status["rep_count"], 0)
         self.assertFalse(status["rep_completed"])
         self.assertTrue(status["rep_aborted"])
+        self.assertIn("Rep not counted: bad form", status["warnings"])
+
+    def test_single_bad_back_frame_does_not_fail_rep(self):
+        tracker = PushupTracker()
+        self._stabilize_tracker(tracker)
+
+        self._run_frame(tracker, elbow_angle=120.0, back_angle=130.0)
+        self._run_frame(tracker, elbow_angle=85.0, back_angle=150.0)
+        self._run_frame(tracker, elbow_angle=120.0, back_angle=150.0)
+        status = self._run_frame(tracker, elbow_angle=170.0, back_angle=150.0)
+
+        self.assertEqual(status["rep_count"], 1)
+        self.assertTrue(status["rep_completed"])
+        self.assertFalse(status["rep_aborted"])
+        self.assertNotIn("Keep your back straight", status["warnings"])
+
+    def test_final_frame_bad_form_can_abort_rep(self):
+        tracker = PushupTracker()
+        self._stabilize_tracker(tracker)
+
+        self._run_frame(tracker, elbow_angle=120.0, back_angle=150.0)
+        self._run_frame(tracker, elbow_angle=85.0, back_angle=150.0)
+        self._run_frame(tracker, elbow_angle=120.0, back_angle=150.0)
+        for _ in range(tracker.BACK_BAD_FRAME_GRACE - 1):
+            self._run_frame(tracker, elbow_angle=120.0, back_angle=130.0)
+        status = self._run_frame(tracker, elbow_angle=170.0, back_angle=130.0)
+
+        self.assertEqual(status["rep_count"], 0)
+        self.assertFalse(status["rep_completed"])
+        self.assertTrue(status["rep_aborted"])
+        self.assertIn("Keep your back straight", status["warnings"])
         self.assertIn("Rep not counted: bad form", status["warnings"])
 
 

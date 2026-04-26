@@ -4,7 +4,7 @@
 
 This project is a real-time, privacy-first computer vision application designed to provide immediate physical form correction and automated workout tracking. Built with React, FastAPI, PyTorch, and OpenCV, it acts as a localized digital personal trainer that runs directly through a standard webcam.
 
-The application currently specializes in automating the tracking of high-volume pushup sets. By leveraging pose estimation (MediaPipe) and biomechanical vector math, the system calculates joint angles frame-by-frame to enforce strict form requirements. It actively monitors elbow descent (breaking 90 degrees) and spinal alignment (maintaining a 180-degree posture), automatically filtering out "cheat" reps.
+The application currently specializes in automating the tracking of high-volume pushup sets. By leveraging pose estimation (MediaPipe) and biomechanical vector math, the system calculates joint angles frame-by-frame to enforce strict form requirements. It actively monitors elbow descent (breaking 90 degrees) and spinal alignment, automatically filtering out "cheat" reps while tolerating brief landmark jitter instead of failing form on a single noisy frame.
 
 Designed for users managing daily rep goals or strict hypertrophy routines, this tool eliminates the guesswork of solo workouts. It ensures that every logged rep is performed with perfect, injury-free mechanics—all processed locally without sending personal video feeds to the cloud.
 
@@ -12,7 +12,7 @@ Designed for users managing daily rep goals or strict hypertrophy routines, this
 
 *   **Real-Time Inference:** Low-latency video processing and form feedback streamed via WebSockets.
 *   **Stable Tracking:** MediaPipe Pose running at `model_complexity=2` with EMA (Exponential Moving Average) temporal smoothing applied to all landmarks, eliminating jitter and ensuring skeleton lines stay precisely appended to limbs.
-*   **Algorithmic Strictness:** Mathematical heuristics that only count reps meeting exact biomechanical angle thresholds. Reps performed with bad form are detected and rejected.
+*   **Algorithmic Strictness:** Mathematical heuristics only count reps meeting biomechanical angle thresholds, with back-form checks debounced so brief pose-estimation noise does not incorrectly reject an otherwise clean rep.
 *   **Audio Coaching:** Built-in synthesized audio cues (ding for a perfect rep, buzz for bad form) allow you to maintain neutral neck posture while exercising.
 *   **Data Portability:** Export full session logs to JSON, complete with timestamps and form metadata, for integration with personal trackers.
 *   **Privacy-First:** Edge-based processing means your webcam feed never leaves your local machine.
