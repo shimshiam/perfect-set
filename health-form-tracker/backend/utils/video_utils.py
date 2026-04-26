@@ -2,7 +2,17 @@ import cv2
 import numpy as np
 from typing import Dict, Tuple, List, Any
 
-def draw_skeleton(img: np.ndarray, landmarks: Dict[str, Tuple[float, float]], color: Tuple[int, int, int] = (255, 255, 255)):
+
+def _image_point(landmarks: Dict[str, Any], key: str) -> Tuple[float, float] | None:
+    point = landmarks.get(key)
+    if point is None:
+        return None
+    if isinstance(point, dict):
+        return point.get("image")
+    return point
+
+
+def draw_skeleton(img: np.ndarray, landmarks: Dict[str, Any], color: Tuple[int, int, int] = (255, 255, 255)):
     """
     Draws the primary skeletal lines for pushup tracking.
     
@@ -26,9 +36,11 @@ def draw_skeleton(img: np.ndarray, landmarks: Dict[str, Tuple[float, float]], co
     for side, side_color in sides:
         for p1_name, p2_name in connections:
             k1, k2 = f"{side}_{p1_name}", f"{side}_{p2_name}"
-            if k1 in landmarks and k2 in landmarks:
-                pt1 = (int(landmarks[k1][0] * w), int(landmarks[k1][1] * h))
-                pt2 = (int(landmarks[k2][0] * w), int(landmarks[k2][1] * h))
+            p1 = _image_point(landmarks, k1)
+            p2 = _image_point(landmarks, k2)
+            if p1 and p2:
+                pt1 = (int(p1[0] * w), int(p1[1] * h))
+                pt2 = (int(p2[0] * w), int(p2[1] * h))
                 
                 # Draw the line
                 cv2.line(img, pt1, pt2, side_color, 3)
@@ -38,7 +50,7 @@ def draw_skeleton(img: np.ndarray, landmarks: Dict[str, Tuple[float, float]], co
                 cv2.circle(img, pt2, 6, (255, 255, 255), -1)
                 cv2.circle(img, pt2, 4, side_color, -1)
 
-def draw_angles(img: np.ndarray, landmarks: Dict[str, Tuple[float, float]], elbow_angle: float, back_angle: float):
+def draw_angles(img: np.ndarray, landmarks: Dict[str, Any], elbow_angle: float, back_angle: float):
     """Draws angle values near the relevant joints."""
     h, w, _ = img.shape
     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -46,20 +58,22 @@ def draw_angles(img: np.ndarray, landmarks: Dict[str, Tuple[float, float]], elbo
     # Resolve the best visible side independently per joint.
     # This avoids silently dropping the back-angle label when the preferred
     # side has an elbow but no hip (or vice versa).
-    elbow_side = 'right' if 'right_elbow' in landmarks else ('left' if 'left_elbow' in landmarks else None)
-    hip_side = 'right' if 'right_hip' in landmarks else ('left' if 'left_hip' in landmarks else None)
+    elbow_side = 'right' if _image_point(landmarks, 'right_elbow') else ('left' if _image_point(landmarks, 'left_elbow') else None)
+    hip_side = 'right' if _image_point(landmarks, 'right_hip') else ('left' if _image_point(landmarks, 'left_hip') else None)
     
-    if elbow_side and f'{elbow_side}_elbow' in landmarks:
-        e_pt = landmarks[f'{elbow_side}_elbow']
-        cv2.putText(img, f"{int(elbow_angle)}deg", 
-                    (int(e_pt[0] * w) + 15, int(e_pt[1] * h)), 
-                    font, 0.6, (255, 255, 255), 2)
+    if elbow_side:
+        e_pt = _image_point(landmarks, f'{elbow_side}_elbow')
+        if e_pt is not None:
+            cv2.putText(img, f"{int(elbow_angle)}deg", 
+                        (int(e_pt[0] * w) + 15, int(e_pt[1] * h)), 
+                        font, 0.6, (255, 255, 255), 2)
                     
-    if hip_side and f'{hip_side}_hip' in landmarks:
-        h_pt = landmarks[f'{hip_side}_hip']
-        cv2.putText(img, f"{int(back_angle)}deg", 
-                    (int(h_pt[0] * w) + 15, int(h_pt[1] * h)), 
-                    font, 0.6, (255, 255, 255), 2)
+    if hip_side:
+        h_pt = _image_point(landmarks, f'{hip_side}_hip')
+        if h_pt is not None:
+            cv2.putText(img, f"{int(back_angle)}deg", 
+                        (int(h_pt[0] * w) + 15, int(h_pt[1] * h)), 
+                        font, 0.6, (255, 255, 255), 2)
 
 def draw_hud(img: np.ndarray, status: Dict[str, Any], fps: int):
     """

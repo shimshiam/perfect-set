@@ -1,7 +1,8 @@
 import math
-from typing import Tuple
+from typing import Sequence
 
-def calculate_angle(a: Tuple[float, float], b: Tuple[float, float], c: Tuple[float, float]) -> float:
+
+def calculate_angle(a: Sequence[float], b: Sequence[float], c: Sequence[float]) -> float:
     """
     Calculates the angle between three points (a, b, c) with b as the vertex.
     
@@ -9,23 +10,24 @@ def calculate_angle(a: Tuple[float, float], b: Tuple[float, float], c: Tuple[flo
     Returns an angle between 0.0 and 180.0 degrees.
     
     Args:
-        a (Tuple[float, float]): Coordinates (x, y) of the first point.
-        b (Tuple[float, float]): Coordinates (x, y) of the vertex point.
-        c (Tuple[float, float]): Coordinates (x, y) of the third point.
+        a: Coordinates of the first point.
+        b: Coordinates of the vertex point.
+        c: Coordinates of the third point.
         
     Returns:
         float: The calculated angle in degrees.
     """
-    # Create vectors ba and bc
-    ba = (a[0] - b[0], a[1] - b[1])
-    bc = (c[0] - b[0], c[1] - b[1])
-    
-    # Calculate dot product
-    dot_product = ba[0] * bc[0] + ba[1] * bc[1]
-    
-    # Calculate magnitudes of the vectors
-    magnitude_ba = math.sqrt(ba[0]**2 + ba[1]**2)
-    magnitude_bc = math.sqrt(bc[0]**2 + bc[1]**2)
+    if len(a) != len(b) or len(b) != len(c):
+        raise ValueError("Angle points must share the same dimensionality.")
+
+    # Create vectors ba and bc in arbitrary dimensional space.
+    ba = [a_i - b_i for a_i, b_i in zip(a, b)]
+    bc = [c_i - b_i for c_i, b_i in zip(c, b)]
+
+    # Calculate dot product and magnitudes.
+    dot_product = sum(ba_i * bc_i for ba_i, bc_i in zip(ba, bc))
+    magnitude_ba = math.sqrt(sum(component ** 2 for component in ba))
+    magnitude_bc = math.sqrt(sum(component ** 2 for component in bc))
     
     # Avoid division by zero if points are identical
     if magnitude_ba == 0 or magnitude_bc == 0:

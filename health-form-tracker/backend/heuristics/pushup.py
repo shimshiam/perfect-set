@@ -1,5 +1,5 @@
 from enum import Enum, auto
-from typing import Dict, Tuple, List, Any
+from typing import Dict, Tuple, List, Any, Sequence
 from utils.geometry import calculate_angle
 
 
@@ -66,10 +66,56 @@ class PushupTracker:
     # ──────────────────────────────────────────────────────────────
 
     @staticmethod
-    def _avg_coord(landmarks: Dict, keys: List[str], axis: int) -> float | None:
+    def _coord(landmarks: Dict, key: str, space: str = "image") -> Sequence[float] | None:
+        point = landmarks.get(key)
+        if point is None:
+            return None
+        if isinstance(point, dict):
+            return point.get(space)
+        return point if space == "image" else None
+
+    @staticmethod
+    def _visibility(landmarks: Dict, key: str) -> float:
+        point = landmarks.get(key)
+        if isinstance(point, dict):
+            return float(point.get("visibility", 1.0))
+        return 1.0
+
+    @staticmethod
+    def _weighted_mean(measures: List[Tuple[float, float]]) -> float | None:
+        if not measures:
+            return None
+        total_weight = sum(weight for _, weight in measures)
+        if total_weight <= 0:
+            return None
+        return sum(value * weight for value, weight in measures) / total_weight
+
+    @classmethod
+    def _avg_coord(cls, landmarks: Dict, keys: List[str], axis: int, space: str = "image") -> float | None:
         """Average a specific coordinate axis (0=x, 1=y) for given keys."""
-        vals = [landmarks[k][axis] for k in keys if k in landmarks]
+        vals = []
+        for key in keys:
+            coord = cls._coord(landmarks, key, space)
+            if coord is not None and len(coord) > axis:
+                vals.append(coord[axis])
         return sum(vals) / len(vals) if vals else None
+
+    @classmethod
+    def _side_weight(cls, landmarks: Dict, side: str, joints: List[str]) -> float:
+        return sum(cls._visibility(landmarks, f"{side}_{joint}") for joint in joints) / len(joints)
+
+    @classmethod
+    def _calculate_side_angle(
+        cls,
+        landmarks: Dict,
+        side: str,
+        joints: Tuple[str, str, str],
+        space: str = "image",
+    ) -> float | None:
+        coords = [cls._coord(landmarks, f"{side}_{joint}", space) for joint in joints]
+        if any(coord is None for coord in coords):
+            return None
+        return calculate_angle(coords[0], coords[1], coords[2])
 
     def _is_horizontal(self, lm: Dict) -> bool:
         """True if body is roughly parallel to the ground."""
@@ -81,8 +127,10 @@ class PushupTracker:
 
     def _is_too_close(self, lm: Dict) -> bool:
         """True if person is too close to camera for accurate tracking."""
-        if 'left_shoulder' in lm and 'right_shoulder' in lm:
-            x_gap = abs(lm['left_shoulder'][0] - lm['right_shoulder'][0])
+        left_shoulder = self._coord(lm, 'left_shoulder')
+        right_shoulder = self._coord(lm, 'right_shoulder')
+        if left_shoulder is not None and right_shoulder is not None:
+            x_gap = abs(left_shoulder[0] - right_shoulder[0])
             return x_gap > self.PROXIMITY_THRESHOLD
         return False
 
@@ -113,7 +161,7 @@ class PushupTracker:
     # Main processing loop
     # ──────────────────────────────────────────────────────────────
 
-    def process_frame(self, landmarks_dict: Dict[str, Tuple[float, float]]) -> Dict[str, Any]:
+    def process_frame(self, landmarks_dict: Dict[str, Any]) -> Dict[str, Any]:
         """
         Processes a single frame of landmarks.
 
@@ -129,8 +177,8 @@ class PushupTracker:
         # ── Landmark presence check ──
         left_keys = ['left_shoulder', 'left_elbow', 'left_wrist', 'left_hip', 'left_ankle']
         right_keys = ['right_shoulder', 'right_elbow', 'right_wrist', 'right_hip', 'right_ankle']
-        left_ok = all(k in landmarks_dict for k in left_keys)
-        right_ok = all(k in landmarks_dict for k in right_keys)
+        left_ok = all(self._coord(landmarks_dict, k) is not None for k in left_keys)
+        right_ok = all(self._coord(landmarks_dict, k) is not None for k in right_keys)
 
         # ── Debounced landmark loss ──
         # Hold the last known state for DEBOUNCE_FRAMES before dropping
@@ -159,35 +207,70 @@ class PushupTracker:
         self._landmark_loss_counter = 0
 
         # ── Calculate angles ──
-        elbow_angles: List[float] = []
-        back_angles: List[float] = []
+        elbow_angles: List[Tuple[float, float]] = []
+        back_angles: List[Tuple[float, float]] = []
 
         if left_ok:
-            elbow_angles.append(calculate_angle(
-                landmarks_dict['left_shoulder'],
-                landmarks_dict['left_elbow'],
-                landmarks_dict['left_wrist'],
-            ))
-            back_angles.append(calculate_angle(
-                landmarks_dict['left_shoulder'],
-                landmarks_dict['left_hip'],
-                landmarks_dict['left_ankle'],
-            ))
+            left_elbow_angle = self._calculate_side_angle(
+                landmarks_dict,
+                "left",
+                ("shoulder", "elbow", "wrist"),
+            )
+            if left_elbow_angle is not None:
+                elbow_angles.append((left_elbow_angle, self._side_weight(landmarks_dict, "left", ["shoulder", "elbow", "wrist"])))
+
+            left_back_angle = self._calculate_side_angle(
+                landmarks_dict,
+                "left",
+                ("shoulder", "hip", "ankle"),
+                space="world",
+            )
+            if left_back_angle is None:
+                left_back_angle = self._calculate_side_angle(
+                    landmarks_dict,
+                    "left",
+                    ("shoulder", "hip", "ankle"),
+                )
+            if left_back_angle is not None:
+                back_angles.append((left_back_angle, self._side_weight(landmarks_dict, "left", ["shoulder", "hip", "ankle"])))
 
         if right_ok:
-            elbow_angles.append(calculate_angle(
-                landmarks_dict['right_shoulder'],
-                landmarks_dict['right_elbow'],
-                landmarks_dict['right_wrist'],
-            ))
-            back_angles.append(calculate_angle(
-                landmarks_dict['right_shoulder'],
-                landmarks_dict['right_hip'],
-                landmarks_dict['right_ankle'],
-            ))
+            right_elbow_angle = self._calculate_side_angle(
+                landmarks_dict,
+                "right",
+                ("shoulder", "elbow", "wrist"),
+            )
+            if right_elbow_angle is not None:
+                elbow_angles.append((right_elbow_angle, self._side_weight(landmarks_dict, "right", ["shoulder", "elbow", "wrist"])))
 
-        elbow_angle = sum(elbow_angles) / len(elbow_angles)
-        back_angle = sum(back_angles) / len(back_angles)
+            right_back_angle = self._calculate_side_angle(
+                landmarks_dict,
+                "right",
+                ("shoulder", "hip", "ankle"),
+                space="world",
+            )
+            if right_back_angle is None:
+                right_back_angle = self._calculate_side_angle(
+                    landmarks_dict,
+                    "right",
+                    ("shoulder", "hip", "ankle"),
+                )
+            if right_back_angle is not None:
+                back_angles.append((right_back_angle, self._side_weight(landmarks_dict, "right", ["shoulder", "hip", "ankle"])))
+
+        elbow_angle = self._weighted_mean(elbow_angles)
+        back_angle = self._weighted_mean(back_angles)
+        if elbow_angle is None or back_angle is None:
+            return {
+                "rep_count": self.rep_count,
+                "rep_completed": False,
+                "rep_aborted": False,
+                "state": self.state.name,
+                "perfect_form": False,
+                "warnings": ["Landmarks missing"],
+                "elbow_angle": None,
+                "back_angle": None,
+            }
 
         # ── Proximity gate ──
         # When too close, 2D foreshortening makes elbows look bent.
