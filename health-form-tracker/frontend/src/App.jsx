@@ -58,7 +58,14 @@ export default function App() {
     });
   }, []);
 
-  const { isConnected, isReconnecting, latestStatus, sendFrame, error: wsError } = useWebSocket(handleRepCompleted, handleRepAborted);
+  const {
+    isConnected,
+    isReconnecting,
+    latestStatus,
+    sendFrame,
+    canSendFrame,
+    error: wsError,
+  } = useWebSocket(handleRepCompleted, handleRepAborted);
 
   const [audioEnabled, setAudioEnabled] = useState(false);
   const handleEnableAudio = useCallback(() => {
@@ -101,6 +108,7 @@ export default function App() {
           captureFrame={captureFrame}
           isReady={isReady}
           sendFrame={sendFrame}
+          canSendFrame={canSendFrame}
           isConnected={isConnected}
           landmarks={landmarks}
         />

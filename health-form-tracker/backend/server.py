@@ -23,6 +23,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from models.pose_detector import PoseDetector
 from heuristics.pushup import PushupTracker
 
+
+def _landmark_image_point(point):
+    if isinstance(point, dict):
+        return point.get("image")
+    return point
+
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
@@ -82,7 +88,8 @@ async def pushup_websocket(websocket: WebSocket):
     Accepts a WebSocket connection for real-time pushup tracking.
 
     Protocol (per message):
-        Client → Server:  JSON  { "frame": "<base64-encoded JPEG>" }
+        Client → Server:  binary JPEG bytes (preferred) or JSON
+                           { "frame": "<base64-encoded JPEG>" }
         Server → Client:  JSON  {
             "rep_count": int,
             "state": str,
@@ -107,28 +114,43 @@ async def pushup_websocket(websocket: WebSocket):
 
     try:
         while True:
-            raw = await websocket.receive_text()
             t_start = time.perf_counter()
+            message = await websocket.receive()
 
-            try:
-                payload = json.loads(raw)
-            except json.JSONDecodeError:
-                await websocket.send_json({"error": "Invalid JSON"})
-                continue
+            if message.get("type") == "websocket.disconnect":
+                raise WebSocketDisconnect()
 
-            frame_b64 = payload.get("frame")
-            if not frame_b64:
-                await websocket.send_json({"error": "Missing 'frame' field"})
-                continue
+            frame_bytes = message.get("bytes")
+            if frame_bytes is None:
+                raw = message.get("text")
+                if raw is None:
+                    await websocket.send_json({"error": "Unsupported message type"})
+                    continue
 
-            # Strip optional data-URL prefix (e.g. "data:image/jpeg;base64,...")
-            if "," in frame_b64:
-                frame_b64 = frame_b64.split(",", 1)[1]
+                try:
+                    payload = json.loads(raw)
+                except json.JSONDecodeError:
+                    await websocket.send_json({"error": "Invalid JSON"})
+                    continue
+
+                frame_b64 = payload.get("frame")
+                if not frame_b64:
+                    await websocket.send_json({"error": "Missing 'frame' field"})
+                    continue
+
+                # Strip optional data-URL prefix (e.g. "data:image/jpeg;base64,...")
+                if "," in frame_b64:
+                    frame_b64 = frame_b64.split(",", 1)[1]
+
+                try:
+                    frame_bytes = base64.b64decode(frame_b64)
+                except Exception:
+                    await websocket.send_json({"error": "Failed to decode image"})
+                    continue
 
             # Decode base64 → numpy array → OpenCV image
             try:
-                img_bytes = base64.b64decode(frame_b64)
-                np_arr = np.frombuffer(img_bytes, dtype=np.uint8)
+                np_arr = np.frombuffer(frame_bytes, dtype=np.uint8)
                 img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
             except Exception:
                 await websocket.send_json({"error": "Failed to decode image"})
@@ -161,7 +183,11 @@ async def pushup_websocket(websocket: WebSocket):
                     "type": "STATUS",
                     **status,
                     "landmarks": (
-                        {k: [round(v[0], 4), round(v[1], 4)] for k, v in landmarks_dict.items()}
+                        {
+                            k: [round(image_point[0], 4), round(image_point[1], 4)]
+                            for k, v in landmarks_dict.items()
+                            if (image_point := _landmark_image_point(v)) is not None
+                        }
                         if landmarks_dict else None
                     ),
                     "processing_ms": round(processing_ms, 1),

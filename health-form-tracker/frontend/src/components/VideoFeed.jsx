@@ -6,27 +6,67 @@ import { useRef, useEffect } from 'react';
 import { drawSkeleton } from '../utils/drawing.js';
 import './VideoFeed.css';
 
-export default function VideoFeed({ videoRef, captureFrame, isReady, sendFrame, isConnected, landmarks }) {
+const FRAME_INTERVAL_MS = 66;
+
+export default function VideoFeed({
+  videoRef,
+  captureFrame,
+  isReady,
+  sendFrame,
+  canSendFrame,
+  isConnected,
+  landmarks,
+}) {
   const canvasRef = useRef(null);
-  const intervalRef = useRef(null);
   const landmarksRef = useRef(landmarks);
   const canvasSizeRef = useRef({ width: 0, height: 0 });
+  const captureInProgressRef = useRef(false);
+  const lastCaptureAtRef = useRef(0);
 
   useEffect(() => {
     landmarksRef.current = landmarks;
   }, [landmarks]);
 
-  // Frame capture loop — throttled to ~15 FPS
+  // Frame capture loop — throttled to ~15 FPS and gated on backend capacity.
   useEffect(() => {
     if (!isReady || !isConnected) return;
 
-    intervalRef.current = setInterval(() => {
-      const frame = captureFrame();
-      if (frame) sendFrame(frame);
-    }, 66); // ~15 FPS
+    let cancelled = false;
+    let animId;
 
-    return () => clearInterval(intervalRef.current);
-  }, [isReady, isConnected, captureFrame, sendFrame]);
+    const tick = (now) => {
+      if (
+        !cancelled &&
+        !captureInProgressRef.current &&
+        now - lastCaptureAtRef.current >= FRAME_INTERVAL_MS &&
+        canSendFrame()
+      ) {
+        captureInProgressRef.current = true;
+        lastCaptureAtRef.current = now;
+        void captureFrame()
+          .then((frame) => {
+            if (!cancelled && frame) {
+              sendFrame(frame);
+            }
+          })
+          .finally(() => {
+            captureInProgressRef.current = false;
+          });
+      }
+
+      if (!cancelled) {
+        animId = requestAnimationFrame(tick);
+      }
+    };
+
+    animId = requestAnimationFrame(tick);
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(animId);
+      captureInProgressRef.current = false;
+    };
+  }, [isReady, isConnected, canSendFrame, captureFrame, sendFrame]);
 
   // Skeleton drawing loop
   useEffect(() => {

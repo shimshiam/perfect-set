@@ -33,7 +33,7 @@ export default function useWebSocket(onRepCompleted, onRepAborted) {
 
     queuedFrameRef.current = null;
     frameInFlightRef.current = true;
-    ws.send(JSON.stringify({ frame: queuedFrame }));
+    ws.send(queuedFrame);
     return true;
   }, []);
 
@@ -146,22 +146,27 @@ export default function useWebSocket(onRepCompleted, onRepAborted) {
     };
   }, [connect]);
 
-  const sendFrame = useCallback((base64Frame) => {
+  const canSendFrame = useCallback(() => {
+    const ws = wsRef.current;
+    return Boolean(ws && ws.readyState === WebSocket.OPEN && !frameInFlightRef.current);
+  }, []);
+
+  const sendFrame = useCallback((frameBlob) => {
     const ws = wsRef.current;
 
-    if (!ws || ws.readyState !== WebSocket.OPEN || !base64Frame) {
+    if (!ws || ws.readyState !== WebSocket.OPEN || !frameBlob) {
       return false;
     }
 
     if (frameInFlightRef.current) {
-      queuedFrameRef.current = base64Frame;
+      queuedFrameRef.current = frameBlob;
       return false;
     }
 
     frameInFlightRef.current = true;
-    ws.send(JSON.stringify({ frame: base64Frame }));
+    ws.send(frameBlob);
     return true;
   }, []);
 
-  return { isConnected, isReconnecting, latestStatus, sendFrame, error };
+  return { isConnected, isReconnecting, latestStatus, sendFrame, canSendFrame, error };
 }

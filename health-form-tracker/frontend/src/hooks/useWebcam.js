@@ -1,7 +1,7 @@
 /**
  * useWebcam.js — Custom hook for accessing the user's webcam.
- * Returns a video ref to attach to a <video> element, a captureFrame()
- * function that returns a base64 JPEG string, and an error state.
+ * Returns a video ref to attach to a <video> element, an async captureFrame()
+ * function that returns a JPEG Blob, and an error state.
  */
 import { useRef, useState, useEffect, useCallback } from 'react';
 
@@ -9,6 +9,8 @@ const VIDEO_CONSTRAINTS = {
   video: { width: 640, height: 480, facingMode: 'user' },
   audio: false,
 };
+const MAX_CAPTURE_WIDTH = 512;
+const JPEG_QUALITY = 0.6;
 
 export default function useWebcam() {
   const videoRef = useRef(null);
@@ -58,17 +60,25 @@ export default function useWebcam() {
 
   const captureFrame = useCallback(() => {
     const video = videoRef.current;
-    if (!video || video.readyState < 2) return null;
+    if (!video || video.readyState < 2) return Promise.resolve(null);
+
+    const sourceWidth = video.videoWidth;
+    const sourceHeight = video.videoHeight;
+    const captureWidth = Math.min(sourceWidth, MAX_CAPTURE_WIDTH);
+    const captureHeight = Math.round((sourceHeight * captureWidth) / sourceWidth);
 
     const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    if (canvas.width !== captureWidth || canvas.height !== captureHeight) {
+      canvas.width = captureWidth;
+      canvas.height = captureHeight;
+    }
 
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
+    ctx.drawImage(video, 0, 0, captureWidth, captureHeight);
 
-    // JPEG at quality 0.7 — ~15KB per frame vs ~100KB for PNG
-    return canvas.toDataURL('image/jpeg', 0.7);
+    return new Promise((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY);
+    });
   }, []);
 
   return { videoRef, captureFrame, isReady, error };

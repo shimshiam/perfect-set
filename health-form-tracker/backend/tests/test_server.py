@@ -1,6 +1,4 @@
-import base64
 import inspect
-import json
 from pathlib import Path
 import sys
 from types import ModuleType, SimpleNamespace
@@ -26,9 +24,8 @@ if "mediapipe" not in sys.modules:
 import server
 
 
-def build_frame_message() -> str:
-    frame_b64 = base64.b64encode(b"test-frame").decode("ascii")
-    return json.dumps({"frame": frame_b64})
+def build_binary_frame_message() -> dict:
+    return {"type": "websocket.receive", "bytes": b"test-frame"}
 
 
 class FakeWebSocket:
@@ -40,11 +37,11 @@ class FakeWebSocket:
     async def accept(self):
         self.accepted = True
 
-    async def receive_text(self):
+    async def receive(self):
         try:
             return next(self._incoming_messages)
-        except StopIteration as exc:
-            raise server.WebSocketDisconnect() from exc
+        except StopIteration:
+            return {"type": "websocket.disconnect"}
 
     async def send_json(self, payload):
         self.sent_messages.append(payload)
@@ -65,7 +62,13 @@ class FakeDetector:
 
     def extract_landmarks(self, results):
         self.extract_landmarks_calls += 1
-        return {"left_shoulder": (0.12345, 0.67891)}
+        return {
+            "left_shoulder": {
+                "image": (0.12345, 0.67891),
+                "world": (0.1, 0.2, 0.3),
+                "visibility": 0.99,
+            }
+        }
 
     def close(self):
         self.closed = True
@@ -90,7 +93,7 @@ class ServerWebSocketTests(unittest.IsolatedAsyncioTestCase):
         FakeDetector.instances = []
 
     async def test_status_precedes_rep_completed_and_pipeline_callable_is_sync(self):
-        websocket = FakeWebSocket([build_frame_message()])
+        websocket = FakeWebSocket([build_binary_frame_message()])
 
         async def fake_to_thread(func, /, *args, **kwargs):
             self.assertFalse(inspect.iscoroutinefunction(func))
@@ -98,6 +101,7 @@ class ServerWebSocketTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(server, "PoseDetector", FakeDetector), \
              patch.object(server, "PushupTracker", FakeTracker), \
+             patch.object(server.cv2, "imdecode", return_value="decoded-image"), \
              patch.object(server.asyncio, "to_thread", new=fake_to_thread):
             await server.pushup_websocket(websocket)
 
