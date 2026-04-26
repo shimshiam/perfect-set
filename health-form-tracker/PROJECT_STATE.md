@@ -2,7 +2,7 @@
 
 ## 1. The Tech Stack
 * **Backend:** Python, FastAPI, WebSockets (for real-time streaming).
-* **Computer Vision & AI:** OpenCV (frame processing), PyTorch (for potential custom models later), and MediaPipe Pose 0.10.14 (`model_complexity=2` for maximum landmark accuracy, with EMA temporal smoothing for jitter reduction).
+* **Computer Vision & AI:** OpenCV (frame processing), PyTorch (for potential custom models later), and MediaPipe Pose 0.10.14 tuned for real-time local inference with landmark visibility filtering, EMA temporal smoothing, and 3D world-landmark posture checks.
 * **Frontend:** React.js.
 * **Hardware:** Standard local webcam. 
 * **Environment:** Device-agnostic (handling CPU or CUDA gracefully).
@@ -45,7 +45,7 @@
 
 ## 3. Core Mathematical Heuristics (The Pushup Logic)
 * **Rep Counter:** A rep is only counted if the elbow angle breaks below 90deg on descent and returns to 160deg+ on ascent.
-* **Form Gating:** Reps with sustained bad form (back angle < 140deg for 3 consecutive active frames) are detected but NOT counted. The warning only clears after the back recovers above 145deg, reducing jitter-induced flicker.
+* **Form Gating:** Reps with sustained bad form (back angle < 140deg for 3 consecutive active frames) are detected but NOT counted. Back-angle evaluation now prefers 3D world landmarks and downweights less-visible body sides, while warnings only clear after recovery above 145deg to reduce jitter-induced flicker.
 * **Orientation Gate:** Compares shoulder Y vs ankle Y. If the person is standing upright, rep counting is locked (prevents "standing pushup" false positives).
 * **Stabilization Gate:** Requires 30 frames (~2s) of continuous horizontal posture before form checking activates (prevents false "bad form" during transition to floor).
 * **Proximity Gate:** If shoulder-to-shoulder x-distance exceeds 35% of frame width, tracking pauses with "Step back" warning (prevents depth distortion false reps).
@@ -58,13 +58,13 @@
 * [x] **Project Structure:** Full-stack directory with `__init__.py` markers.
 * [x] **`backend/utils/geometry.py`:** `calculate_angle` using vector dot products.
 * [x] **`backend/utils/ssl_utils.py`:** Centralizes the macOS MediaPipe certificate workaround. Detector initialization now uses a scoped HTTPS context backed by `certifi`, with an opt-out env var (`PERFECT_SET_DISABLE_MEDIAPIPE_SSL_WORKAROUND=1`) instead of a process-wide import-time override.
-* [x] **`backend/models/pose_detector.py`:** `PoseDetector` wrapper for MediaPipe. Upgraded to `model_complexity=2`, raised confidence thresholds to 0.7, added Exponential Moving Average (EMA) smoothing (`alpha=0.6`) on all landmarks to reduce tracking jitter, and moved macOS certificate handling into the scoped SSL helper used only during `Pose()` initialization.
-* [x] **`backend/heuristics/pushup.py`:** State-machine tracker with form-gated rep counting. Bad-form history now stays sticky through ASCENDING→BOTTOM bounces so a rep that already broke form cannot become countable again mid-cycle. Back-form warnings now require 3 consecutive below-threshold frames and clear with hysteresis after recovery above 145deg, which reduces false positives from pose jitter. Rep completion is also evaluated after the final back-form check so a noisy last frame cannot be counted before being rejected.
+* [x] **`backend/models/pose_detector.py`:** `PoseDetector` wrapper for MediaPipe. It now runs in a faster real-time configuration (`model_complexity=1`), downsizes oversized frames before inference, filters out low-visibility landmarks, keeps EMA-smoothed 2D image landmarks for rendering, and preserves EMA-smoothed 3D world landmarks for posture checks. macOS certificate handling remains scoped to `Pose()` initialization.
+* [x] **`backend/heuristics/pushup.py`:** State-machine tracker with form-gated rep counting. Bad-form history now stays sticky through ASCENDING→BOTTOM bounces so a rep that already broke form cannot become countable again mid-cycle. Back-form warnings now require 3 consecutive below-threshold frames, use visibility-weighted side angles, prefer 3D shoulder-hip-ankle world geometry, and clear with hysteresis after recovery above 145deg. Rep completion is evaluated after the final back-form check so a noisy last frame cannot be counted before being rejected.
 * [x] **`backend/utils/video_utils.py`:** Visualization for local OpenCV test suite. Fixed `draw_angles` to resolve the best visible landmark side independently per joint (elbow vs. hip), preventing silent rendering miss.
 * [x] **`backend/main.py`:** Local OpenCV test suite. Added camera warmup loop and consecutive-failure retry counter (tolerates up to 10 bad frames before exiting). SSL setup is now inherited through `PoseDetector` instead of duplicated at the entry-point.
-* [x] **`backend/server.py`:** FastAPI WebSocket server. Fixed `REP_COMPLETED`/`REP_ABORTED` event ordering. The full pose pipeline now runs in `asyncio.to_thread` via a synchronous callable so the event loop stays responsive and the worker thread returns actual landmarks, not a coroutine. `rep_count` is captured before status mutation for reliable event delivery.
+* [x] **`backend/server.py`:** FastAPI WebSocket server. Fixed `REP_COMPLETED`/`REP_ABORTED` event ordering. The full pose pipeline now runs in `asyncio.to_thread` via a synchronous callable so the event loop stays responsive and the worker thread returns actual landmarks, not a coroutine. The socket now accepts binary JPEG frames directly (while keeping JSON/base64 compatibility), which cuts per-frame transport overhead. `rep_count` is captured before status mutation for reliable event delivery.
 * [x] **`backend/tests/`:** Added automated `unittest` regression coverage for stabilization gating, debounced landmark loss, bad-form bounce handling, and WebSocket message ordering / synchronous pipeline execution.
-* [x] **`frontend/`:** React + Vite app with webcam capture, WebSocket streaming, skeleton overlay, dashboard, and session log. Session history and rep counters persist in `localStorage`, survive refresh, and still export as JSON. Frame upload now uses one-frame-in-flight backpressure with a latest-frame queue, and the overlay canvas only resizes when the video dimensions actually change.
+* [x] **`frontend/`:** React + Vite app with webcam capture, WebSocket streaming, skeleton overlay, dashboard, and session log. Session history and rep counters persist in `localStorage`, survive refresh, and still export as JSON. Frame upload now uses one-frame-in-flight backpressure with a latest-frame queue, captures downscaled JPEG blobs instead of synchronous base64 strings, and schedules capture with `requestAnimationFrame` so the UI stays responsive while matching backend capacity.
 * [x] **Audio Feedback:** Real-time synthesized audio cues for counted reps (ding) and form warnings (buzz).
 * [x] **Session Export:** Download complete session logs as JSON with timestamps and form flags.
 
