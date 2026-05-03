@@ -24,20 +24,64 @@ Designed for users managing daily rep goals or strict hypertrophy routines, this
 
 ## Getting Started (Local Development)
 
-To test the pushup tracker locally using your webcam:
+Use two terminals: one for the Python backend and one for the React frontend.
 
-1.  **Install dependencies:**
+### Backend
+
+The backend uses OpenCV and MediaPipe. On macOS, use Python 3.12 for the virtual environment; Python 3.13 may not have a compatible MediaPipe wheel for the pinned dependency.
+
+1.  **Create and activate the backend environment:**
     ```bash
     cd health-form-tracker
-    uv pip install -r requirements.txt
+    python3.12 -m venv .venv
+    source .venv/bin/activate
+    python -m pip install --upgrade pip
+    python -m pip install -r requirements.txt
     ```
-2.  **Run the local test script:**
+2.  **Verify the required backend packages import:**
     ```bash
-    # From the health-form-tracker/backend/ directory
-    cd backend
-    python main.py
+    python -c "import cv2, mediapipe, uvicorn; print('backend deps ok')"
     ```
-3.  **Usage:** A window will open mirroring your webcam. Perform pushups to see the rep counter and form feedback in real-time. Press **'q'** in the video window to exit.
+3.  **Start the API/WebSocket server:**
+    ```bash
+    cd backend
+    python -m uvicorn server:app --host 127.0.0.1 --port 8000 --reload
+    ```
+4.  **Check that it is running:**
+    ```bash
+    curl http://127.0.0.1:8000/health
+    ```
+
+Leave this terminal running while using the frontend.
+
+### Frontend
+
+In a second terminal:
+
+1.  **Install frontend dependencies:**
+    ```bash
+    cd health-form-tracker/frontend
+    npm install
+    ```
+2.  **Start the Vite dev server:**
+    ```bash
+    npm run dev -- --host 127.0.0.1
+    ```
+3.  **Open the app:**
+    Visit `http://127.0.0.1:5173/` in your browser. Choose **Pushups** or **Squats**, allow camera access, hold the guided calibration pose until the dashboard shows ready, then begin the set.
+
+### Optional Local OpenCV Test
+
+To test the pushup tracker without the React frontend:
+
+```bash
+cd health-form-tracker
+source .venv/bin/activate
+cd backend
+python main.py
+```
+
+A window will open mirroring your webcam. Perform pushups to see the rep counter and form feedback in real time. Press **'q'** in the video window to exit.
 
 ## Running the WebSocket Server
 
@@ -45,11 +89,13 @@ To serve the tracker as an API for the React frontend:
 
 1.  **Start the server:**
     ```bash
-    cd health-form-tracker/backend
-    python -m uvicorn server:app --host [IP_ADDRESS] --port 8000 --reload
+    cd health-form-tracker
+    source .venv/bin/activate
+    cd backend
+    python -m uvicorn server:app --host 127.0.0.1 --port 8000 --reload
     ```
-2.  **Health check:** Visit `http://[IP_ADDRESS]/health` to verify the server is running.
-3.  **WebSocket endpoints:** Connect to `ws://[IP_ADDRESS]/ws/pushups` or `ws://[IP_ADDRESS]/ws/squats` and send binary JPEG frames. JSON/base64 payloads are still accepted for compatibility:
+2.  **Health check:** Visit `http://127.0.0.1:8000/health` to verify the server is running.
+3.  **WebSocket endpoints:** Connect to `ws://127.0.0.1:8000/ws/pushups` or `ws://127.0.0.1:8000/ws/squats` and send binary JPEG frames. JSON/base64 payloads are still accepted for compatibility:
     ```json
     { "frame": "<base64-encoded JPEG>" }
     ```
@@ -75,9 +121,9 @@ To serve the tracker as an API for the React frontend:
     ```
 2.  **Start the dev server:**
     ```bash
-    npm run dev
+    npm run dev -- --host 127.0.0.1
     ```
-3.  Open `http://localhost:5173` in your browser. Make sure the backend server is also running.
+3.  Open `http://127.0.0.1:5173/` in your browser. Make sure the backend server is also running.
 4.  Choose **Pushups** or **Squats** in the header. Hold the guided calibration pose until the dashboard shows ready, then start the set.
 
 ## Validation
