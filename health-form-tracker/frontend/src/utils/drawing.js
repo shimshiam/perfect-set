@@ -9,7 +9,8 @@ const CONNECTIONS = [
   ['shoulder', 'elbow'],
   ['elbow', 'wrist'],
   ['shoulder', 'hip'],
-  ['hip', 'ankle'],
+  ['hip', 'knee'],
+  ['knee', 'ankle'],
 ];
 
 const SIDE_COLORS = {
@@ -54,7 +55,7 @@ export function drawSkeleton(ctx, landmarks, width, height) {
     }
 
     // Draw joint dots
-    const joints = ['shoulder', 'elbow', 'wrist', 'hip', 'ankle'];
+    const joints = ['shoulder', 'elbow', 'wrist', 'hip', 'knee', 'ankle'];
     for (const joint of joints) {
       const key = `${side}_${joint}`;
       if (landmarks[key]) {

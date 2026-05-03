@@ -1,12 +1,27 @@
 from pathlib import Path
 import sys
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 import unittest
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
+
+if "cv2" not in sys.modules:
+    cv2_stub = ModuleType("cv2")
+    cv2_stub.IMREAD_COLOR = 1
+    cv2_stub.imdecode = lambda *_args, **_kwargs: "decoded-image"
+    cv2_stub.resize = lambda img, *_args, **_kwargs: img
+    cv2_stub.cvtColor = lambda img, *_args, **_kwargs: img
+    cv2_stub.COLOR_BGR2RGB = 1
+    cv2_stub.INTER_AREA = 1
+    sys.modules["cv2"] = cv2_stub
+
+if "mediapipe" not in sys.modules:
+    mediapipe_stub = ModuleType("mediapipe")
+    mediapipe_stub.solutions = SimpleNamespace(pose=SimpleNamespace(Pose=None))
+    sys.modules["mediapipe"] = mediapipe_stub
 
 from models.pose_detector import PoseDetector
 
@@ -36,8 +51,10 @@ class PoseDetectorTests(unittest.TestCase):
                 RIGHT_WRIST=5,
                 LEFT_HIP=6,
                 RIGHT_HIP=7,
-                LEFT_ANKLE=8,
-                RIGHT_ANKLE=9,
+                LEFT_KNEE=8,
+                RIGHT_KNEE=9,
+                LEFT_ANKLE=10,
+                RIGHT_ANKLE=11,
             )
         )
         return detector
@@ -57,6 +74,8 @@ class PoseDetectorTests(unittest.TestCase):
                     FakeLandmark(0.45, 0.55, visibility=0.90),
                     FakeLandmark(0.50, 0.60, visibility=0.90),
                     FakeLandmark(0.55, 0.65, visibility=0.90),
+                    FakeLandmark(0.60, 0.70, visibility=0.90),
+                    FakeLandmark(0.65, 0.75, visibility=0.90),
                 ]
             ),
             pose_world_landmarks=SimpleNamespace(
@@ -71,6 +90,8 @@ class PoseDetectorTests(unittest.TestCase):
                     FakeLandmark(4.5, 5.5, 6.5),
                     FakeLandmark(5.0, 6.0, 7.0),
                     FakeLandmark(5.5, 6.5, 7.5),
+                    FakeLandmark(6.0, 7.0, 8.0),
+                    FakeLandmark(6.5, 7.5, 8.5),
                 ]
             ),
         )

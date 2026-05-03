@@ -5,11 +5,15 @@
  */
 import { useRef, useState, useEffect, useCallback } from 'react';
 
-const WS_URL = 'ws://localhost:8000/ws/pushups';
+const WS_BASE_URL = 'ws://localhost:8000/ws';
 const RECONNECT_DELAY_MS = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;
+const EXERCISE_ROUTES = {
+  pushup: 'pushups',
+  squat: 'squats',
+};
 
-export default function useWebSocket(onRepCompleted, onRepAborted) {
+export default function useWebSocket(exercise, onRepCompleted, onRepAborted) {
   const wsRef = useRef(null);
   const connectRef = useRef(() => {});
   const reconnectAttempts = useRef(0);
@@ -67,7 +71,8 @@ export default function useWebSocket(onRepCompleted, onRepAborted) {
     if (!mountedRef.current) return;
 
     try {
-      const ws = new WebSocket(WS_URL);
+      const route = EXERCISE_ROUTES[exercise] ?? EXERCISE_ROUTES.pushup;
+      const ws = new WebSocket(`${WS_BASE_URL}/${route}`);
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -92,12 +97,12 @@ export default function useWebSocket(onRepCompleted, onRepAborted) {
           }
 
           if (data.type === "REP_COMPLETED") {
-            if (onRepCompleted) onRepCompleted();
+            if (onRepCompleted) onRepCompleted(data);
             return;
           }
 
           if (data.type === "REP_ABORTED") {
-            if (onRepAborted) onRepAborted();
+            if (onRepAborted) onRepAborted(data);
             return;
           }
 
@@ -125,7 +130,7 @@ export default function useWebSocket(onRepCompleted, onRepAborted) {
       resetFrameQueue();
       attemptReconnect();
     }
-  }, [attemptReconnect, onRepAborted, onRepCompleted, releaseFrameSlot, resetFrameQueue]);
+  }, [attemptReconnect, exercise, onRepAborted, onRepCompleted, releaseFrameSlot, resetFrameQueue]);
 
   useEffect(() => {
     connectRef.current = connect;
@@ -133,6 +138,9 @@ export default function useWebSocket(onRepCompleted, onRepAborted) {
 
   useEffect(() => {
     mountedRef.current = true;
+    setLatestStatus(null);
+    setError(null);
+    resetFrameQueue();
     connect();
 
     return () => {
@@ -144,7 +152,7 @@ export default function useWebSocket(onRepCompleted, onRepAborted) {
         wsRef.current = null;
       }
     };
-  }, [connect]);
+  }, [connect, resetFrameQueue]);
 
   const canSendFrame = useCallback(() => {
     const ws = wsRef.current;

@@ -120,9 +120,36 @@
   background: #5566aa;
 }
 
+.dashboard__phase-badge--calibrating,
 .dashboard__phase-badge--stabilizing {
   background: var(--accent-yellow);
   animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+.dashboard__phase-badge--standing {
+  background: var(--accent-green);
+}
+
+.dashboard__progress {
+  height: 8px;
+  border-radius: var(--radius-round);
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.dashboard__progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-green);
+  transition: width 200ms ease;
+}
+
+.dashboard__hint {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
 }
 
 /* ── Form Status ── */
@@ -161,6 +188,23 @@
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--accent-red);
+}
+
+.dashboard__card--quality {
+  padding: 14px 16px;
+}
+
+.dashboard__quality-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.dashboard__quality-grid strong {
+  color: var(--text-primary);
+  font-size: 0.82rem;
 }
 
 /* ── Angles ── */

@@ -75,17 +75,33 @@ class FakeDetector:
 
 
 class FakeTracker:
-    def process_frame(self, landmarks_dict):
+    def _status(self):
         return {
+            "exercise": "pushup",
             "rep_count": 3,
             "rep_completed": True,
             "rep_aborted": False,
             "state": "UP",
             "perfect_form": True,
+            "faults": [],
             "warnings": [],
+            "setup_guidance": None,
+            "calibration": {"complete": True, "progress": 1.0, "message": "Ready"},
+            "rep_quality": {
+                "exercise": "pushup",
+                "result": "completed",
+                "counted": True,
+                "min_elbow_angle": 82.0,
+                "max_elbow_angle": 170.0,
+                "min_back_angle": 160.0,
+                "fault_codes": [],
+            },
             "elbow_angle": 170.0,
             "back_angle": 175.0,
         }
+
+    def process_frame(self, landmarks_dict, timestamp_ms=None):
+        return self._status()
 
 
 class ServerWebSocketTests(unittest.IsolatedAsyncioTestCase):
@@ -112,11 +128,37 @@ class ServerWebSocketTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(websocket.sent_messages[0]["rep_count"], 3)
         self.assertEqual(websocket.sent_messages[1]["count"], 3)
+        self.assertEqual(websocket.sent_messages[1]["exercise"], "pushup")
+        self.assertEqual(websocket.sent_messages[1]["rep_quality"]["result"], "completed")
+        self.assertEqual(websocket.sent_messages[0]["faults"], [])
+        self.assertTrue(websocket.sent_messages[0]["calibration"]["complete"])
         self.assertEqual(
             websocket.sent_messages[0]["landmarks"]["left_shoulder"],
             [0.1235, 0.6789],
         )
         self.assertTrue(FakeDetector.instances[0].closed)
+
+    async def test_squat_endpoint_uses_squat_tracker(self):
+        websocket = FakeWebSocket([build_binary_frame_message()])
+
+        class FakeSquatTracker(FakeTracker):
+            def _status(self):
+                status = super()._status()
+                status["exercise"] = "squat"
+                status["state"] = "STANDING"
+                return status
+
+        async def fake_to_thread(func, /, *args, **kwargs):
+            return func(*args, **kwargs)
+
+        with patch.object(server, "PoseDetector", FakeDetector), \
+             patch.object(server, "SquatTracker", FakeSquatTracker), \
+             patch.object(server.cv2, "imdecode", return_value="decoded-image"), \
+             patch.object(server.asyncio, "to_thread", new=fake_to_thread):
+            await server.squat_websocket(websocket)
+
+        self.assertEqual(websocket.sent_messages[0]["exercise"], "squat")
+        self.assertEqual(websocket.sent_messages[1]["exercise"], "squat")
 
 
 if __name__ == "__main__":

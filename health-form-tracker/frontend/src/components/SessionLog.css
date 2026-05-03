@@ -20,7 +20,47 @@
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.1em;
+  margin-bottom: 4px;
+}
+
+.session-log__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
   margin-bottom: 12px;
+}
+
+.session-log__summary {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.session-log__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.session-log__export-btn,
+.session-log__reset-btn {
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.session-log__export-btn {
+  color: var(--bg-primary);
+  background: var(--accent-cyan);
+}
+
+.session-log__reset-btn {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
 }
 
 .session-log__empty {
@@ -44,6 +84,14 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.session-log__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .session-log__item:last-child {
   border-bottom: none;
 }
@@ -52,7 +100,6 @@
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-primary);
-  min-width: 55px;
 }
 
 .session-log__time {

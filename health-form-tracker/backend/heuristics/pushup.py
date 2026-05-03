@@ -1,69 +1,52 @@
 from enum import Enum, auto
-from typing import Dict, Tuple, List, Any, Sequence
+from typing import Any, Dict, List, Sequence, Tuple
+import time
+
+from heuristics.common import base_status, calibration_status, make_fault
 from utils.geometry import calculate_angle
 
 
 class PushupState(Enum):
-    PAUSED = auto()       # No landmarks detected (debounced)
-    IDLE = auto()         # Person detected but standing / not in pushup position
-    STABILIZING = auto()  # Horizontal, waiting for posture to stabilize
-    UP = auto()           # Arms extended — top of rep
-    DESCENDING = auto()   # Lowering body
-    BOTTOM = auto()       # Arms fully bent — bottom of rep
-    ASCENDING = auto()    # Pushing back up
+    PAUSED = auto()
+    IDLE = auto()
+    CALIBRATING = auto()
+    UP = auto()
+    DESCENDING = auto()
+    BOTTOM = auto()
+    ASCENDING = auto()
 
 
 class PushupTracker:
-    """
-    State machine that interprets landmark data frame-by-frame
-    to count reps and evaluate physical form during a pushup.
+    """State machine for calibrated pushup counting and form coaching."""
 
-    Guards against false positives from:
-    - Standing with arm movement (orientation gate)
-    - Transitioning into position (stabilization period)
-    - Camera proximity distortion (shoulder-width gate)
-    - Landmark flicker (debounced loss detection)
-    """
+    EXERCISE = "pushup"
 
-    # ── Angle Thresholds ──
     ELBOW_FLEXION = 90.0
     ELBOW_EXTENSION = 160.0
     BACK_TOLERANCE = 140.0
     BACK_RECOVERY_TOLERANCE = 145.0
     BACK_BAD_FRAME_GRACE = 3
-
-    # ── Orientation Gate ──
-    # Max |avg_shoulder_y - avg_ankle_y| to be considered horizontal.
-    # Values above this mean the person is standing upright.
     VERTICAL_THRESHOLD = 0.25
-
-    # ── Proximity Gate ──
-    # Max normalized x-distance between left & right shoulder.
-    # Exceeding this means the person is too close for accurate 2D tracking.
     PROXIMITY_THRESHOLD = 0.35
-
-    # ── Stabilization ──
-    # Frames of continuous horizontal posture required before rep counting
-    # activates. At 15 FPS (WebSocket rate), 30 frames ≈ 2 seconds.
-    STABILIZE_FRAMES = 30
-
-    # ── Debounce ──
-    # Consecutive frames without landmarks before dropping to PAUSED.
-    # Prevents flickering when the model briefly loses confidence.
+    CALIBRATION_FRAMES = 30
+    STABILIZE_FRAMES = CALIBRATION_FRAMES
     DEBOUNCE_FRAMES = 15
 
     def __init__(self):
         self.state = PushupState.PAUSED
         self.rep_count = 0
         self._form_maintained = True
-        self._stabilize_counter = 0
         self._landmark_loss_counter = 0
         self._bad_back_frame_counter = 0
         self._back_form_bad = False
-
-    # ──────────────────────────────────────────────────────────────
-    # Helper methods
-    # ──────────────────────────────────────────────────────────────
+        self._calibration_counter = 0
+        self._calibrated = False
+        self._baseline_shoulder_width: float | None = None
+        self._rep_start_ms: float | None = None
+        self._rep_min_elbow: float | None = None
+        self._rep_max_elbow: float | None = None
+        self._rep_min_back: float | None = None
+        self._rep_fault_codes: set[str] = set()
 
     @staticmethod
     def _coord(landmarks: Dict, key: str, space: str = "image") -> Sequence[float] | None:
@@ -92,13 +75,12 @@ class PushupTracker:
 
     @classmethod
     def _avg_coord(cls, landmarks: Dict, keys: List[str], axis: int, space: str = "image") -> float | None:
-        """Average a specific coordinate axis (0=x, 1=y) for given keys."""
-        vals = []
+        values = []
         for key in keys:
             coord = cls._coord(landmarks, key, space)
             if coord is not None and len(coord) > axis:
-                vals.append(coord[axis])
-        return sum(vals) / len(vals) if vals else None
+                values.append(coord[axis])
+        return sum(values) / len(values) if values else None
 
     @classmethod
     def _side_weight(cls, landmarks: Dict, side: str, joints: List[str]) -> float:
@@ -117,28 +99,121 @@ class PushupTracker:
             return None
         return calculate_angle(coords[0], coords[1], coords[2])
 
-    def _is_horizontal(self, lm: Dict) -> bool:
-        """True if body is roughly parallel to the ground."""
-        shoulder_y = self._avg_coord(lm, ['left_shoulder', 'right_shoulder'], 1)
-        ankle_y = self._avg_coord(lm, ['left_ankle', 'right_ankle'], 1)
+    def _angles(self, landmarks: Dict[str, Any]) -> Tuple[float | None, float | None]:
+        elbow_angles: List[Tuple[float, float]] = []
+        back_angles: List[Tuple[float, float]] = []
+
+        for side in ("left", "right"):
+            elbow_angle = self._calculate_side_angle(landmarks, side, ("shoulder", "elbow", "wrist"))
+            if elbow_angle is not None:
+                elbow_angles.append((elbow_angle, self._side_weight(landmarks, side, ["shoulder", "elbow", "wrist"])))
+
+            back_angle = self._calculate_side_angle(landmarks, side, ("shoulder", "hip", "ankle"), space="world")
+            if back_angle is None:
+                back_angle = self._calculate_side_angle(landmarks, side, ("shoulder", "hip", "ankle"))
+            if back_angle is not None:
+                back_angles.append((back_angle, self._side_weight(landmarks, side, ["shoulder", "hip", "ankle"])))
+
+        return self._weighted_mean(elbow_angles), self._weighted_mean(back_angles)
+
+    def _has_required_side(self, landmarks: Dict[str, Any]) -> bool:
+        joints = ("shoulder", "elbow", "wrist", "hip", "ankle")
+        return any(all(self._coord(landmarks, f"{side}_{joint}") is not None for joint in joints) for side in ("left", "right"))
+
+    def _is_horizontal(self, landmarks: Dict[str, Any]) -> bool:
+        shoulder_y = self._avg_coord(landmarks, ["left_shoulder", "right_shoulder"], 1)
+        ankle_y = self._avg_coord(landmarks, ["left_ankle", "right_ankle"], 1)
         if shoulder_y is None or ankle_y is None:
             return False
         return abs(shoulder_y - ankle_y) < self.VERTICAL_THRESHOLD
 
-    def _is_too_close(self, lm: Dict) -> bool:
-        """True if person is too close to camera for accurate tracking."""
-        left_shoulder = self._coord(lm, 'left_shoulder')
-        right_shoulder = self._coord(lm, 'right_shoulder')
-        if left_shoulder is not None and right_shoulder is not None:
-            x_gap = abs(left_shoulder[0] - right_shoulder[0])
-            return x_gap > self.PROXIMITY_THRESHOLD
-        return False
+    def _shoulder_width(self, landmarks: Dict[str, Any]) -> float | None:
+        left_shoulder = self._coord(landmarks, "left_shoulder")
+        right_shoulder = self._coord(landmarks, "right_shoulder")
+        if left_shoulder is None or right_shoulder is None:
+            return None
+        return abs(left_shoulder[0] - right_shoulder[0])
+
+    def _is_too_close(self, landmarks: Dict[str, Any]) -> bool:
+        width = self._shoulder_width(landmarks)
+        return width is not None and width > self.PROXIMITY_THRESHOLD
 
     def _reset_back_form_tracking(self) -> None:
         self._bad_back_frame_counter = 0
         self._back_form_bad = False
 
-    def _evaluate_back_form(self, back_angle: float, warnings: List[str]) -> bool:
+    def _reset_rep_quality(self) -> None:
+        self._rep_start_ms = None
+        self._rep_min_elbow = None
+        self._rep_max_elbow = None
+        self._rep_min_back = None
+        self._rep_fault_codes = set()
+
+    def _start_rep_quality(self, timestamp_ms: float, elbow_angle: float, back_angle: float) -> None:
+        self._rep_start_ms = timestamp_ms
+        self._rep_min_elbow = elbow_angle
+        self._rep_max_elbow = elbow_angle
+        self._rep_min_back = back_angle
+        self._rep_fault_codes = set()
+
+    def _update_rep_quality(self, elbow_angle: float, back_angle: float, faults: List[Dict[str, str]]) -> None:
+        if self._rep_start_ms is None:
+            return
+        self._rep_min_elbow = min(self._rep_min_elbow, elbow_angle) if self._rep_min_elbow is not None else elbow_angle
+        self._rep_max_elbow = max(self._rep_max_elbow, elbow_angle) if self._rep_max_elbow is not None else elbow_angle
+        self._rep_min_back = min(self._rep_min_back, back_angle) if self._rep_min_back is not None else back_angle
+        for fault in faults:
+            self._rep_fault_codes.add(fault["code"])
+
+    def _finish_rep_quality(self, timestamp_ms: float, counted: bool, result: str) -> Dict[str, Any]:
+        duration_ms = None if self._rep_start_ms is None else max(0, int(timestamp_ms - self._rep_start_ms))
+        quality = {
+            "exercise": self.EXERCISE,
+            "result": result,
+            "counted": counted,
+            "duration_ms": duration_ms,
+            "min_elbow_angle": self._round_angle(self._rep_min_elbow),
+            "max_elbow_angle": self._round_angle(self._rep_max_elbow),
+            "min_back_angle": self._round_angle(self._rep_min_back),
+            "fault_codes": sorted(self._rep_fault_codes),
+        }
+        self._reset_rep_quality()
+        return quality
+
+    @staticmethod
+    def _round_angle(value: float | None) -> float | None:
+        return round(value, 1) if value is not None else None
+
+    def _calibration(self, message: str = "Hold a stable plank position") -> Dict[str, Any]:
+        return calibration_status(self._calibrated, self._calibration_counter / self.CALIBRATION_FRAMES, message)
+
+    def _status(
+        self,
+        *,
+        perfect_form: bool,
+        faults: List[Dict[str, str]] | None = None,
+        setup_guidance: str | None = None,
+        elbow_angle: float | None = None,
+        back_angle: float | None = None,
+        rep_completed: bool = False,
+        rep_aborted: bool = False,
+        rep_quality: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        return base_status(
+            exercise=self.EXERCISE,
+            rep_count=self.rep_count,
+            rep_completed=rep_completed,
+            rep_aborted=rep_aborted,
+            state=self.state.name,
+            perfect_form=perfect_form,
+            faults=faults,
+            setup_guidance=setup_guidance,
+            calibration=self._calibration(setup_guidance or "Ready"),
+            rep_quality=rep_quality,
+            angles={"elbow_angle": elbow_angle, "back_angle": back_angle},
+        )
+
+    def _evaluate_back_form(self, back_angle: float, faults: List[Dict[str, str]]) -> bool:
         if back_angle < self.BACK_TOLERANCE:
             self._bad_back_frame_counter += 1
         else:
@@ -151,233 +226,118 @@ class PushupTracker:
             self._back_form_bad = True
 
         if self._back_form_bad:
-            warnings.append("Keep your back straight")
+            faults.append(make_fault("BACK_SAG", "high", "Keep your back straight"))
             self._form_maintained = False
             return False
-
         return True
 
-    # ──────────────────────────────────────────────────────────────
-    # Main processing loop
-    # ──────────────────────────────────────────────────────────────
-
-    def process_frame(self, landmarks_dict: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Processes a single frame of landmarks.
-
-        Returns:
-            Dictionary with: rep_count, state, perfect_form, warnings,
-            elbow_angle, back_angle.
-        """
-        warnings: List[str] = []
+    def process_frame(self, landmarks_dict: Dict[str, Any], timestamp_ms: float | None = None) -> Dict[str, Any]:
+        timestamp_ms = timestamp_ms if timestamp_ms is not None else time.monotonic() * 1000
+        faults: List[Dict[str, str]] = []
         perfect_form = True
-        rep_completed = False
-        rep_aborted = False
 
-        # ── Landmark presence check ──
-        left_keys = ['left_shoulder', 'left_elbow', 'left_wrist', 'left_hip', 'left_ankle']
-        right_keys = ['right_shoulder', 'right_elbow', 'right_wrist', 'right_hip', 'right_ankle']
-        left_ok = all(self._coord(landmarks_dict, k) is not None for k in left_keys)
-        right_ok = all(self._coord(landmarks_dict, k) is not None for k in right_keys)
-
-        # ── Debounced landmark loss ──
-        # Hold the last known state for DEBOUNCE_FRAMES before dropping
-        # to PAUSED, preventing UI flicker during brief confidence drops.
-        if not left_ok and not right_ok:
+        if not self._has_required_side(landmarks_dict):
             self._landmark_loss_counter += 1
             if self._landmark_loss_counter >= self.DEBOUNCE_FRAMES:
                 self.state = PushupState.PAUSED
-                self._stabilize_counter = 0
+                self._calibrated = False
+                self._calibration_counter = 0
                 self._form_maintained = True
                 self._reset_back_form_tracking()
-            # During debounce: keep self.state as last known value.
-            # After debounce: state is PAUSED.
-            return {
-                "rep_count": self.rep_count,
-                "rep_completed": False,
-                "rep_aborted": False,
-                "state": self.state.name,
-                "perfect_form": False,
-                "warnings": ["Landmarks missing"] if self.state == PushupState.PAUSED else [],
-                "elbow_angle": None,
-                "back_angle": None,
-            }
+                self._reset_rep_quality()
+                faults.append(make_fault("LANDMARKS_MISSING", "high", "Full body not visible"))
+            return self._status(perfect_form=False, faults=faults, setup_guidance="Move so shoulders, elbows, wrists, hips, and ankles are visible")
 
-        # Landmarks found — reset debounce counter
         self._landmark_loss_counter = 0
-
-        # ── Calculate angles ──
-        elbow_angles: List[Tuple[float, float]] = []
-        back_angles: List[Tuple[float, float]] = []
-
-        if left_ok:
-            left_elbow_angle = self._calculate_side_angle(
-                landmarks_dict,
-                "left",
-                ("shoulder", "elbow", "wrist"),
-            )
-            if left_elbow_angle is not None:
-                elbow_angles.append((left_elbow_angle, self._side_weight(landmarks_dict, "left", ["shoulder", "elbow", "wrist"])))
-
-            left_back_angle = self._calculate_side_angle(
-                landmarks_dict,
-                "left",
-                ("shoulder", "hip", "ankle"),
-                space="world",
-            )
-            if left_back_angle is None:
-                left_back_angle = self._calculate_side_angle(
-                    landmarks_dict,
-                    "left",
-                    ("shoulder", "hip", "ankle"),
-                )
-            if left_back_angle is not None:
-                back_angles.append((left_back_angle, self._side_weight(landmarks_dict, "left", ["shoulder", "hip", "ankle"])))
-
-        if right_ok:
-            right_elbow_angle = self._calculate_side_angle(
-                landmarks_dict,
-                "right",
-                ("shoulder", "elbow", "wrist"),
-            )
-            if right_elbow_angle is not None:
-                elbow_angles.append((right_elbow_angle, self._side_weight(landmarks_dict, "right", ["shoulder", "elbow", "wrist"])))
-
-            right_back_angle = self._calculate_side_angle(
-                landmarks_dict,
-                "right",
-                ("shoulder", "hip", "ankle"),
-                space="world",
-            )
-            if right_back_angle is None:
-                right_back_angle = self._calculate_side_angle(
-                    landmarks_dict,
-                    "right",
-                    ("shoulder", "hip", "ankle"),
-                )
-            if right_back_angle is not None:
-                back_angles.append((right_back_angle, self._side_weight(landmarks_dict, "right", ["shoulder", "hip", "ankle"])))
-
-        elbow_angle = self._weighted_mean(elbow_angles)
-        back_angle = self._weighted_mean(back_angles)
+        elbow_angle, back_angle = self._angles(landmarks_dict)
         if elbow_angle is None or back_angle is None:
-            return {
-                "rep_count": self.rep_count,
-                "rep_completed": False,
-                "rep_aborted": False,
-                "state": self.state.name,
-                "perfect_form": False,
-                "warnings": ["Landmarks missing"],
-                "elbow_angle": None,
-                "back_angle": None,
-            }
+            faults.append(make_fault("LANDMARKS_MISSING", "high", "Full body not visible"))
+            return self._status(perfect_form=False, faults=faults, setup_guidance="Move so your full side profile is visible")
 
-        # ── Proximity gate ──
-        # When too close, 2D foreshortening makes elbows look bent.
-        # Freeze the state machine and warn the user.
         if self._is_too_close(landmarks_dict):
-            warnings.append("Step back from camera")
-            return {
-                "rep_count": self.rep_count,
-                "rep_completed": False,
-                "rep_aborted": False,
-                "state": self.state.name,
-                "perfect_form": True,
-                "warnings": warnings,
-                "elbow_angle": elbow_angle,
-                "back_angle": back_angle,
-            }
+            faults.append(make_fault("TOO_CLOSE", "medium", "Step back from camera"))
+            return self._status(perfect_form=False, faults=faults, setup_guidance="Step back until your full body fits", elbow_angle=elbow_angle, back_angle=back_angle)
 
-        # ── Orientation gate ──
-        # Only activate pushup tracking when the body is horizontal.
-        # Standing + bending elbows must NOT count as reps.
         if not self._is_horizontal(landmarks_dict):
             self.state = PushupState.IDLE
-            self._stabilize_counter = 0
+            self._calibrated = False
+            self._calibration_counter = 0
             self._form_maintained = True
             self._reset_back_form_tracking()
-            return {
-                "rep_count": self.rep_count,
-                "rep_completed": False,
-                "rep_aborted": False,
-                "state": self.state.name,
-                "perfect_form": True,
-                "warnings": [],
-                "elbow_angle": elbow_angle,
-                "back_angle": back_angle,
-            }
+            self._reset_rep_quality()
+            faults.append(make_fault("BODY_NOT_HORIZONTAL", "medium", "Get into a plank position"))
+            return self._status(perfect_form=True, faults=faults, setup_guidance="Get into a side-on plank position", elbow_angle=elbow_angle, back_angle=back_angle)
 
-        # ── Stabilization gate ──
-        # Require N frames of continuous horizontal posture before
-        # activating form checks. Prevents false "bad form" warnings
-        # while the user is bending down to get into position.
-        if self.state in (PushupState.PAUSED, PushupState.IDLE, PushupState.STABILIZING):
-            self._stabilize_counter += 1
-            if self._stabilize_counter < self.STABILIZE_FRAMES:
-                self.state = PushupState.STABILIZING
-                self._reset_back_form_tracking()
-                return {
-                    "rep_count": self.rep_count,
-                    "rep_completed": False,
-                    "rep_aborted": False,
-                    "state": self.state.name,
-                    "perfect_form": True,
-                    "warnings": ["Getting into position..."],
-                    "elbow_angle": elbow_angle,
-                    "back_angle": back_angle,
-                }
-            else:
-                # Stabilized — enter active tracking
+        if not self._calibrated:
+            self.state = PushupState.CALIBRATING
+            self._calibration_counter += 1
+            width = self._shoulder_width(landmarks_dict)
+            if width is not None:
+                if self._baseline_shoulder_width is None:
+                    self._baseline_shoulder_width = width
+                else:
+                    self._baseline_shoulder_width = (self._baseline_shoulder_width * 0.9) + (width * 0.1)
+            faults.append(make_fault("CALIBRATING", "info", "Hold plank for calibration"))
+            if self._calibration_counter >= self.CALIBRATION_FRAMES:
+                self._calibrated = True
                 self.state = PushupState.UP
                 self._form_maintained = True
                 self._reset_back_form_tracking()
+                faults = []
+            return self._status(perfect_form=True, faults=faults, setup_guidance="Hold a stable plank position", elbow_angle=elbow_angle, back_angle=back_angle)
 
-        # ── State machine: pushup rep counting ──
         finalize_rep = False
+        rep_completed = False
+        rep_aborted = False
+        rep_quality = None
+
+        if self.state in (PushupState.PAUSED, PushupState.IDLE, PushupState.CALIBRATING):
+            self.state = PushupState.UP
+
         if self.state == PushupState.UP:
             if elbow_angle < self.ELBOW_EXTENSION:
                 self.state = PushupState.DESCENDING
-                self._form_maintained = True  # Reset for new rep cycle
-
+                self._form_maintained = True
+                self._start_rep_quality(timestamp_ms, elbow_angle, back_angle)
         elif self.state == PushupState.DESCENDING:
             if elbow_angle <= self.ELBOW_FLEXION:
                 self.state = PushupState.BOTTOM
             elif elbow_angle >= self.ELBOW_EXTENSION:
                 self.state = PushupState.UP
-
+                self._reset_rep_quality()
         elif self.state == PushupState.BOTTOM:
             if elbow_angle > self.ELBOW_FLEXION:
                 self.state = PushupState.ASCENDING
-
         elif self.state == PushupState.ASCENDING:
             if elbow_angle >= self.ELBOW_EXTENSION:
                 self.state = PushupState.UP
                 finalize_rep = True
             elif elbow_angle <= self.ELBOW_FLEXION:
-                # A bounce returns to BOTTOM inside the same rep cycle, so preserve
-                # any prior bad-form history until the rep either aborts or finishes.
                 self.state = PushupState.BOTTOM
 
-        # ── Form evaluation (only active after stabilization) ──
-        if not self._evaluate_back_form(back_angle, warnings):
+        if not self._evaluate_back_form(back_angle, faults):
             perfect_form = False
+
+        self._update_rep_quality(elbow_angle, back_angle, faults)
 
         if finalize_rep:
             if self._form_maintained:
                 self.rep_count += 1
                 rep_completed = True
+                rep_quality = self._finish_rep_quality(timestamp_ms, counted=True, result="completed")
             else:
-                warnings.append("Rep not counted: bad form")
+                faults.append(make_fault("REP_BAD_FORM", "high", "Rep not counted: bad form"))
+                self._rep_fault_codes.add("REP_BAD_FORM")
                 rep_aborted = True
+                rep_quality = self._finish_rep_quality(timestamp_ms, counted=False, result="aborted")
             self._form_maintained = True
 
-        return {
-            "rep_count": self.rep_count,
-            "rep_completed": rep_completed,
-            "rep_aborted": rep_aborted,
-            "state": self.state.name,
-            "perfect_form": perfect_form,
-            "warnings": warnings,
-            "elbow_angle": elbow_angle,
-            "back_angle": back_angle,
-        }
+        return self._status(
+            perfect_form=perfect_form,
+            faults=faults,
+            elbow_angle=elbow_angle,
+            back_angle=back_angle,
+            rep_completed=rep_completed,
+            rep_aborted=rep_aborted,
+            rep_quality=rep_quality,
+        )

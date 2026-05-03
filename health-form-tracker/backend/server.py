@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from models.pose_detector import PoseDetector
 from heuristics.pushup import PushupTracker
+from heuristics.squat import SquatTracker
 
 
 def _landmark_image_point(point):
@@ -82,10 +83,9 @@ async def health_check():
 # ---------------------------------------------------------------------------
 # WebSocket endpoint
 # ---------------------------------------------------------------------------
-@app.websocket("/ws/pushups")
-async def pushup_websocket(websocket: WebSocket):
+async def _exercise_websocket(websocket: WebSocket, tracker_cls):
     """
-    Accepts a WebSocket connection for real-time pushup tracking.
+    Accepts a WebSocket connection for real-time exercise tracking.
 
     Protocol (per message):
         Client → Server:  binary JPEG bytes (preferred) or JSON
@@ -97,6 +97,10 @@ async def pushup_websocket(websocket: WebSocket):
             "warnings": [str],
             "elbow_angle": float | null,
             "back_angle": float | null,
+            "faults": [{ "code": str, "severity": str, "message": str }],
+            "setup_guidance": str | null,
+            "calibration": { "complete": bool, "progress": float, "message": str },
+            "rep_quality": object | null,
             "landmarks": { "left_shoulder": [x, y], ... } | null,
             "processing_ms": float
         }
@@ -110,7 +114,7 @@ async def pushup_websocket(websocket: WebSocket):
     # Each connection gets its own stateful instances.
     # MediaPipe Pose is NOT thread-safe, so sharing is not an option.
     detector = PoseDetector()
-    tracker = PushupTracker()
+    tracker = tracker_cls()
 
     try:
         while True:
@@ -170,11 +174,13 @@ async def pushup_websocket(websocket: WebSocket):
                     return detector.extract_landmarks(r)
 
                 landmarks_dict = await asyncio.to_thread(_run_pipeline)
-                status = tracker.process_frame(landmarks_dict)
+                status = tracker.process_frame(landmarks_dict, timestamp_ms=time.time() * 1000)
 
                 rep_completed = status.pop("rep_completed", False)
                 rep_aborted = status.pop("rep_aborted", False)
                 current_rep_count = status["rep_count"]  # Capture before any further mutation
+                rep_quality = status.get("rep_quality")
+                exercise = status.get("exercise")
 
                 processing_ms = (time.perf_counter() - t_start) * 1000
 
@@ -196,9 +202,19 @@ async def pushup_websocket(websocket: WebSocket):
 
                 # Send rep events AFTER STATUS so client sees the correct count
                 if rep_completed:
-                    await websocket.send_json({"type": "REP_COMPLETED", "count": current_rep_count})
+                    await websocket.send_json({
+                        "type": "REP_COMPLETED",
+                        "exercise": exercise,
+                        "count": current_rep_count,
+                        "rep_quality": rep_quality,
+                    })
                 if rep_aborted:
-                    await websocket.send_json({"type": "REP_ABORTED", "count": current_rep_count})
+                    await websocket.send_json({
+                        "type": "REP_ABORTED",
+                        "exercise": exercise,
+                        "count": current_rep_count,
+                        "rep_quality": rep_quality,
+                    })
             except Exception as e:
                 logger.error(f"Processing error during core pipeline: {e}")
                 continue
@@ -212,3 +228,13 @@ async def pushup_websocket(websocket: WebSocket):
         async with _connection_lock:
             _connection_count -= 1
         logger.info(f"Connection closed. Active connections: {_connection_count}")
+
+
+@app.websocket("/ws/pushups")
+async def pushup_websocket(websocket: WebSocket):
+    await _exercise_websocket(websocket, PushupTracker)
+
+
+@app.websocket("/ws/squats")
+async def squat_websocket(websocket: WebSocket):
+    await _exercise_websocket(websocket, SquatTracker)

@@ -12,6 +12,10 @@
 /* ── Header ── */
 .app__header {
   margin-bottom: 24px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .app__title {
@@ -32,6 +36,48 @@
   margin-top: 2px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.app__controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.app__exercise-selector {
+  display: inline-flex;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+
+.app__exercise-button,
+.app__audio-button {
+  border: 0;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.app__exercise-button {
+  padding: 9px 14px;
+  color: var(--text-secondary);
+  background: transparent;
+}
+
+.app__exercise-button--active {
+  color: var(--bg-primary);
+  background: var(--accent-green);
+}
+
+.app__audio-button {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-cyan);
+  color: var(--bg-primary);
 }
 
 /* ── Errors ── */
@@ -69,6 +115,14 @@
 
   .app__main {
     flex-direction: column;
+  }
+
+  .app__header {
+    flex-direction: column;
+  }
+
+  .app__controls {
+    justify-content: flex-start;
   }
 
   .app__sidebar {
