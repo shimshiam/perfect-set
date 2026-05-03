@@ -73,11 +73,12 @@ class SquatTrackerTests(unittest.TestCase):
         tracker = SquatTracker()
         self._calibrate_tracker(tracker)
 
-        self._run_frame(tracker, knee_angle=140.0, torso_angle=130.0, timestamp_ms=100)
-        self._run_frame(tracker, knee_angle=120.0, torso_angle=130.0, timestamp_ms=140)
-        self._run_frame(tracker, knee_angle=95.0, torso_angle=130.0, timestamp_ms=180)
-        self._run_frame(tracker, knee_angle=125.0, torso_angle=150.0, timestamp_ms=240)
-        status = self._run_frame(tracker, knee_angle=170.0, torso_angle=160.0, timestamp_ms=320)
+        self._run_frame(tracker, knee_angle=140.0, torso_angle=100.0, timestamp_ms=100)
+        self._run_frame(tracker, knee_angle=120.0, torso_angle=100.0, timestamp_ms=140)
+        self._run_frame(tracker, knee_angle=95.0, torso_angle=100.0, timestamp_ms=180)
+        self._run_frame(tracker, knee_angle=95.0, torso_angle=100.0, timestamp_ms=220)
+        self._run_frame(tracker, knee_angle=125.0, torso_angle=100.0, timestamp_ms=260)
+        status = self._run_frame(tracker, knee_angle=170.0, torso_angle=160.0, timestamp_ms=340)
 
         self.assertEqual(status["rep_count"], 0)
         self.assertTrue(status["rep_aborted"])

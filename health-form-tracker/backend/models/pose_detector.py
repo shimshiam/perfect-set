@@ -30,7 +30,7 @@ class PoseDetector:
                  min_detection_confidence: float = 0.6,
                  min_tracking_confidence: float = 0.6,
                  smoothing_alpha: float = 0.55,
-                 visibility_threshold: float = 0.65,
+                 visibility_threshold: float = 0.45,
                  max_processing_dimension: int = 512):
         """
         Initializes the MediaPipe Pose detector with smoothing.

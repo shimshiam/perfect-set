@@ -24,9 +24,9 @@ class SquatTracker:
     KNEE_EXTENSION = 160.0
     DESCENT_START = 145.0
     DEPTH_THRESHOLD = 105.0
-    TORSO_TOLERANCE = 135.0
-    TORSO_RECOVERY_TOLERANCE = 145.0
-    TORSO_BAD_FRAME_GRACE = 3
+    TORSO_TOLERANCE = 110.0
+    TORSO_RECOVERY_TOLERANCE = 120.0
+    TORSO_BAD_FRAME_GRACE = 5
     CALIBRATION_FRAMES = 30
     DEBOUNCE_FRAMES = 15
 
@@ -190,7 +190,7 @@ class SquatTracker:
         return quality
 
     def _is_standing_for_calibration(self, knee_angle: float, torso_angle: float) -> bool:
-        return knee_angle >= self.KNEE_EXTENSION and torso_angle >= self.TORSO_RECOVERY_TOLERANCE
+        return knee_angle >= self.KNEE_EXTENSION and torso_angle >= self.TORSO_TOLERANCE
 
     def _evaluate_torso_form(self, torso_angle: float, faults: List[Dict[str, str]]) -> bool:
         if torso_angle < self.TORSO_TOLERANCE:
@@ -205,7 +205,7 @@ class SquatTracker:
             self._torso_form_bad = True
 
         if self._torso_form_bad:
-            faults.append(make_fault("TORSO_LEAN", "high", "Keep your chest up"))
+            faults.append(make_fault("TORSO_LEAN", "high", "Keep your torso controlled"))
             self._form_maintained = False
             return False
         return True

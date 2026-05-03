@@ -19,6 +19,14 @@ HORIZONTAL_LANDMARKS = {
     "left_ankle": (0.58, 0.47),
 }
 
+KNEE_FALLBACK_LANDMARKS = {
+    "left_shoulder": (0.30, 0.40),
+    "left_elbow": (0.38, 0.42),
+    "left_wrist": (0.46, 0.44),
+    "left_hip": (0.42, 0.43),
+    "left_knee": (0.52, 0.48),
+}
+
 
 class PushupTrackerTests(unittest.TestCase):
     def _run_frame(self, tracker: PushupTracker, elbow_angle: float, back_angle: float, timestamp_ms: float = 0):
@@ -45,6 +53,16 @@ class PushupTrackerTests(unittest.TestCase):
         self.assertEqual(status["state"], PushupState.UP.name)
         self.assertTrue(status["calibration"]["complete"])
         self.assertEqual(status["rep_count"], 0)
+
+    def test_pushup_setup_accepts_knee_when_ankle_is_not_visible(self):
+        tracker = PushupTracker()
+        angles = iter([170.0, 170.0])
+        with patch("heuristics.pushup.calculate_angle", side_effect=lambda *_args: next(angles)):
+            status = tracker.process_frame(dict(KNEE_FALLBACK_LANDMARKS))
+
+        self.assertEqual(status["state"], PushupState.CALIBRATING.name)
+        self.assertEqual(status["faults"][0]["code"], "CALIBRATING")
+        self.assertEqual(status["back_angle"], 170.0)
 
     def test_landmarks_missing_only_pause_after_debounce_window(self):
         tracker = PushupTracker()
