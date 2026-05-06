@@ -5,13 +5,22 @@
  */
 import { useRef, useState, useEffect, useCallback } from 'react';
 
-const WS_BASE_URL = 'ws://localhost:8000/ws';
 const RECONNECT_DELAY_MS = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const EXERCISE_ROUTES = {
   pushup: 'pushups',
   squat: 'squats',
 };
+
+function getWebSocketBaseUrl() {
+  const configuredBaseUrl = import.meta.env.VITE_WS_BASE_URL;
+  if (configuredBaseUrl) {
+    return configuredBaseUrl.replace(/\/$/, '');
+  }
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.hostname}:8000/ws`;
+}
 
 export default function useWebSocket(exercise, onRepCompleted, onRepAborted) {
   const wsRef = useRef(null);
@@ -72,7 +81,7 @@ export default function useWebSocket(exercise, onRepCompleted, onRepAborted) {
 
     try {
       const route = EXERCISE_ROUTES[exercise] ?? EXERCISE_ROUTES.pushup;
-      const ws = new WebSocket(`${WS_BASE_URL}/${route}`);
+      const ws = new WebSocket(`${getWebSocketBaseUrl()}/${route}`);
       wsRef.current = ws;
 
       ws.onopen = () => {

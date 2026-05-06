@@ -20,15 +20,29 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from models.pose_detector import PoseDetector
 from heuristics.pushup import PushupTracker
 from heuristics.squat import SquatTracker
+
+
+PoseDetector = None
 
 
 def _landmark_image_point(point):
     if isinstance(point, dict):
         return point.get("image")
     return point
+
+
+def _pose_detector_cls():
+    global PoseDetector
+    if PoseDetector is None:
+        from models.pose_detector import PoseDetector as imported_pose_detector
+        PoseDetector = imported_pose_detector
+    return PoseDetector
+
+
+def _create_pose_detector():
+    return _pose_detector_cls()()
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -111,12 +125,14 @@ async def _exercise_websocket(websocket: WebSocket, tracker_cls):
         _connection_count += 1
     logger.info(f"Client connected. Active connections: {_connection_count}")
 
-    # Each connection gets its own stateful instances.
-    # MediaPipe Pose is NOT thread-safe, so sharing is not an option.
-    detector = PoseDetector()
-    tracker = tracker_cls()
+    detector = None
 
     try:
+        # Each connection gets its own stateful instances.
+        # MediaPipe Pose is NOT thread-safe, so sharing is not an option.
+        detector = await asyncio.to_thread(_create_pose_detector)
+        tracker = tracker_cls()
+
         while True:
             t_start = time.perf_counter()
             message = await websocket.receive()
@@ -221,10 +237,17 @@ async def _exercise_websocket(websocket: WebSocket, tracker_cls):
 
     except WebSocketDisconnect:
         logger.info("Client disconnected normally.")
+    except ImportError as e:
+        logger.exception("Pose detector dependency failed to import")
+        await websocket.send_json({
+            "error": "Pose detector dependency failed to import. Reinstall backend requirements.",
+            "detail": str(e),
+        })
     except Exception as e:
-        logger.error(f"WebSocket error: {e}")
+        logger.exception(f"WebSocket error: {e}")
     finally:
-        detector.close()
+        if detector is not None:
+            detector.close()
         async with _connection_lock:
             _connection_count -= 1
         logger.info(f"Connection closed. Active connections: {_connection_count}")
