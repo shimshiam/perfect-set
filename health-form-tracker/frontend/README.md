@@ -5,10 +5,11 @@ React + Vite client for the Perfect Set physical form tracker. The frontend capt
 ## Features
 
 - Webcam capture with a mirrored local preview
-- Real-time pushup status updates over WebSocket
+- Real-time pushup and squat status updates over WebSocket
 - Skeleton overlay and dashboard telemetry
 - Persistent session history with JSON export
 - Audio cues for completed reps and form warnings
+- Pushup tracking optimized for side or 3-quarter views, with lower-body inference when feet or knees are cropped
 
 ## Development
 
@@ -19,11 +20,13 @@ npm install
 npm run dev
 ```
 
-The app expects the backend WebSocket server at `ws://localhost:8000/ws/pushups`.
+The app expects the backend WebSocket server at `ws://localhost:8000/ws` and connects to `/pushups` or `/squats` based on the selected exercise.
+
+For pushups, keep the working-side shoulder, elbow, wrist, and hip visible. Feet and knees can leave the frame; the backend will reduce posture strictness instead of asking for full-body visibility.
 
 ## Session Storage
 
-Session state is stored locally in the browser under `perfect-set/session/v1`. Reloading the page restores:
+Session state is stored locally in the browser under `perfect-set/session/v2`. Reloading the page restores:
 
 - completed rep count
 - aborted rep count

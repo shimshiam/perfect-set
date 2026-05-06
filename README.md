@@ -11,9 +11,9 @@ Designed for users managing daily rep goals or strict hypertrophy routines, this
 ## Key Features
 
 *   **Real-Time Inference:** Low-latency video processing and form feedback streamed via WebSockets.
-*   **Stable Tracking:** MediaPipe Pose running in a real-time configuration with EMA (Exponential Moving Average) smoothing, low-visibility landmark filtering, and 3D world-landmark back-angle checks to reduce jitter and false posture warnings.
+*   **Stable Tracking:** MediaPipe Pose running in a real-time configuration with EMA (Exponential Moving Average) smoothing, low-visibility landmark filtering, and 3D world-landmark back-angle checks when enough lower-body landmarks are visible.
 *   **Algorithmic Strictness:** Mathematical heuristics only count reps meeting biomechanical angle thresholds, with back-form checks debounced so brief pose-estimation noise does not incorrectly reject an otherwise clean rep.
-*   **Guided Calibration:** Pushups and squats require a short stable setup hold before counting begins, adapting the tracker to the current camera/body position.
+*   **Guided Calibration:** Pushups and squats require a short stable setup hold before counting begins, adapting the tracker to the current camera/body position. Pushups are optimized for side or 3-quarter views and can keep tracking when feet are cropped, as long as the working-side shoulder, elbow, wrist, and hip remain visible.
 *   **Structured Coaching:** Backend responses include structured fault codes, severity, setup guidance, calibration progress, and per-rep quality metrics in addition to compatibility warning strings.
 *   **Multi-Exercise Sessions:** The frontend supports manual Pushups/Squats selection, persists mixed workout history, migrates old pushup-only sessions, and exports v2 JSON logs with rep quality data.
 *   **Faster Streaming:** The frontend now captures downscaled JPEG blobs and streams them as binary WebSocket frames, reducing client/server overhead compared with base64 payloads.
@@ -70,6 +70,8 @@ In a second terminal:
 3.  **Open the app:**
     Visit `http://127.0.0.1:5173/` in your browser. Choose **Pushups** or **Squats**, allow camera access, hold the guided calibration pose until the dashboard shows ready, then begin the set.
 
+For pushups, use a side or 3-quarter camera angle. The tracker can infer lower-body position when feet or knees leave the frame, but it still needs a clear shoulder, elbow, wrist, and hip on at least one side for reliable rep counting.
+
 ### Optional Local OpenCV Test
 
 To test the pushup tracker without the React frontend:
@@ -125,6 +127,8 @@ To serve the tracker as an API for the React frontend:
     ```
 3.  Open `http://127.0.0.1:5173/` in your browser. Make sure the backend server is also running.
 4.  Choose **Pushups** or **Squats** in the header. Hold the guided calibration pose until the dashboard shows ready, then start the set.
+
+For best pushup results, keep one side of your upper body visible. Feet and knees may be cropped after setup; missing lower-body landmarks reduce posture strictness instead of blocking counting.
 
 ## Validation
 
