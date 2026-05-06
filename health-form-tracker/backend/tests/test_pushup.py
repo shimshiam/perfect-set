@@ -27,12 +27,50 @@ KNEE_FALLBACK_LANDMARKS = {
     "left_knee": (0.52, 0.48),
 }
 
+UPPER_BODY_ONLY_LANDMARKS = {
+    "left_shoulder": (0.30, 0.40),
+    "left_elbow": (0.38, 0.42),
+    "left_wrist": (0.46, 0.44),
+    "left_hip": (0.42, 0.43),
+}
+
+
+def visible_point(x, y, visibility):
+    return {"image": (x, y), "world": None, "visibility": visibility}
+
+
+AMBIGUOUS_TWO_SIDE_LANDMARKS = {
+    "left_shoulder": (0.30, 0.40),
+    "left_elbow": (0.38, 0.42),
+    "left_wrist": (0.46, 0.44),
+    "left_hip": (0.42, 0.43),
+    "right_shoulder": (0.70, 0.40),
+    "right_elbow": (0.62, 0.42),
+    "right_wrist": (0.54, 0.44),
+    "right_hip": (0.58, 0.43),
+}
+
+RIGHT_SIDE_STRONGER_LANDMARKS = {
+    "left_shoulder": visible_point(0.30, 0.40, 0.50),
+    "left_elbow": visible_point(0.38, 0.42, 0.50),
+    "left_wrist": visible_point(0.46, 0.44, 0.50),
+    "left_hip": visible_point(0.42, 0.43, 0.50),
+    "right_shoulder": visible_point(0.62, 0.40, 0.95),
+    "right_elbow": visible_point(0.56, 0.42, 0.95),
+    "right_wrist": visible_point(0.50, 0.44, 0.95),
+    "right_hip": visible_point(0.54, 0.43, 0.95),
+}
+
 
 class PushupTrackerTests(unittest.TestCase):
     def _run_frame(self, tracker: PushupTracker, elbow_angle: float, back_angle: float, timestamp_ms: float = 0):
         angles = iter([elbow_angle, back_angle])
         with patch("heuristics.pushup.calculate_angle", side_effect=lambda *_args: next(angles)):
             return tracker.process_frame(dict(HORIZONTAL_LANDMARKS), timestamp_ms=timestamp_ms)
+
+    def _run_upper_body_frame(self, tracker: PushupTracker, elbow_angle: float, timestamp_ms: float = 0):
+        with patch("heuristics.pushup.calculate_angle", return_value=elbow_angle):
+            return tracker.process_frame(dict(UPPER_BODY_ONLY_LANDMARKS), timestamp_ms=timestamp_ms)
 
     def _calibrate_tracker(self, tracker: PushupTracker):
         status = None
@@ -63,6 +101,39 @@ class PushupTrackerTests(unittest.TestCase):
         self.assertEqual(status["state"], PushupState.CALIBRATING.name)
         self.assertEqual(status["faults"][0]["code"], "CALIBRATING")
         self.assertEqual(status["back_angle"], 170.0)
+
+    def test_pushup_setup_accepts_upper_body_when_feet_and_knees_are_cropped(self):
+        tracker = PushupTracker()
+
+        for i in range(tracker.CALIBRATION_FRAMES):
+            status = self._run_upper_body_frame(tracker, elbow_angle=170.0, timestamp_ms=i * 33)
+
+        self.assertEqual(status["state"], PushupState.UP.name)
+        self.assertTrue(status["calibration"]["complete"])
+        self.assertIsNone(status["back_angle"])
+
+        self._run_upper_body_frame(tracker, elbow_angle=120.0, timestamp_ms=1100)
+        self._run_upper_body_frame(tracker, elbow_angle=85.0, timestamp_ms=1140)
+        self._run_upper_body_frame(tracker, elbow_angle=120.0, timestamp_ms=1180)
+        status = self._run_upper_body_frame(tracker, elbow_angle=170.0, timestamp_ms=1220)
+
+        self.assertEqual(status["rep_count"], 1)
+        self.assertTrue(status["rep_completed"])
+        self.assertEqual(status["rep_quality"]["min_elbow_angle"], 85.0)
+        self.assertIsNone(status["rep_quality"]["min_back_angle"])
+
+    def test_missing_lower_body_does_not_emit_plank_or_back_faults(self):
+        tracker = PushupTracker()
+        for i in range(tracker.CALIBRATION_FRAMES):
+            self._run_upper_body_frame(tracker, elbow_angle=170.0, timestamp_ms=i * 33)
+
+        for i in range(tracker.BACK_BAD_FRAME_GRACE + 2):
+            status = self._run_upper_body_frame(tracker, elbow_angle=120.0, timestamp_ms=1100 + i)
+
+        fault_codes = [fault["code"] for fault in status["faults"]]
+        self.assertNotIn("BODY_NOT_HORIZONTAL", fault_codes)
+        self.assertNotIn("LANDMARKS_MISSING", fault_codes)
+        self.assertNotIn("BACK_SAG", fault_codes)
 
     def test_landmarks_missing_only_pause_after_debounce_window(self):
         tracker = PushupTracker()
@@ -127,6 +198,45 @@ class PushupTrackerTests(unittest.TestCase):
         self.assertFalse(status["rep_completed"])
         self.assertTrue(status["rep_aborted"])
         self.assertEqual([fault["code"] for fault in status["faults"]], ["BACK_SAG", "REP_BAD_FORM"])
+
+    def test_uses_stronger_side_when_both_sides_are_visible(self):
+        tracker = PushupTracker()
+        angles = iter([88.0, 170.0])
+        with patch("heuristics.pushup.calculate_angle", side_effect=lambda *_args: next(angles)):
+            status = tracker.process_frame(dict(RIGHT_SIDE_STRONGER_LANDMARKS))
+
+        self.assertEqual(status["elbow_angle"], 88.0)
+        self.assertEqual(status["faults"][0]["code"], "CALIBRATING")
+
+    def test_ambiguous_two_side_elbow_angles_request_better_camera_angle(self):
+        tracker = PushupTracker()
+        angles = iter([170.0, 80.0])
+        with patch("heuristics.pushup.calculate_angle", side_effect=lambda *_args: next(angles)):
+            status = tracker.process_frame(dict(AMBIGUOUS_TWO_SIDE_LANDMARKS))
+
+        self.assertEqual(status["state"], PushupState.PAUSED.name)
+        self.assertEqual(status["faults"][0]["code"], "CAMERA_ANGLE_UNCERTAIN")
+        self.assertIn("side", status["setup_guidance"])
+
+    def test_ambiguous_active_rep_is_not_counted_later(self):
+        tracker = PushupTracker()
+        for i in range(tracker.CALIBRATION_FRAMES):
+            self._run_upper_body_frame(tracker, elbow_angle=170.0, timestamp_ms=i * 33)
+
+        self._run_upper_body_frame(tracker, elbow_angle=120.0, timestamp_ms=1100)
+        angles = iter([120.0, 40.0])
+        with patch("heuristics.pushup.calculate_angle", side_effect=lambda *_args: next(angles)):
+            ambiguous = tracker.process_frame(dict(AMBIGUOUS_TWO_SIDE_LANDMARKS), timestamp_ms=1120)
+
+        self.assertEqual(ambiguous["faults"][0]["code"], "CAMERA_ANGLE_UNCERTAIN")
+
+        self._run_upper_body_frame(tracker, elbow_angle=85.0, timestamp_ms=1140)
+        self._run_upper_body_frame(tracker, elbow_angle=120.0, timestamp_ms=1180)
+        status = self._run_upper_body_frame(tracker, elbow_angle=170.0, timestamp_ms=1220)
+
+        self.assertEqual(status["rep_count"], 0)
+        self.assertTrue(status["rep_aborted"])
+        self.assertIn("CAMERA_ANGLE_UNCERTAIN", status["rep_quality"]["fault_codes"])
 
 
 if __name__ == "__main__":
