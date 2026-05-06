@@ -31,6 +31,10 @@ class PushupTracker:
     CALIBRATION_FRAMES = 30
     STABILIZE_FRAMES = CALIBRATION_FRAMES
     DEBOUNCE_FRAMES = 15
+    UPPER_BODY_JOINTS = ("shoulder", "elbow", "wrist", "hip")
+    POSTURE_FULL = "full"
+    POSTURE_KNEE_FALLBACK = "knee_fallback"
+    POSTURE_INFERRED_LOWER_BODY = "inferred_lower_body"
 
     def __init__(self):
         self.state = PushupState.PAUSED
@@ -64,24 +68,6 @@ class PushupTracker:
             return float(point.get("visibility", 1.0))
         return 1.0
 
-    @staticmethod
-    def _weighted_mean(measures: List[Tuple[float, float]]) -> float | None:
-        if not measures:
-            return None
-        total_weight = sum(weight for _, weight in measures)
-        if total_weight <= 0:
-            return None
-        return sum(value * weight for value, weight in measures) / total_weight
-
-    @classmethod
-    def _avg_coord(cls, landmarks: Dict, keys: List[str], axis: int, space: str = "image") -> float | None:
-        values = []
-        for key in keys:
-            coord = cls._coord(landmarks, key, space)
-            if coord is not None and len(coord) > axis:
-                values.append(coord[axis])
-        return sum(values) / len(values) if values else None
-
     @classmethod
     def _side_weight(cls, landmarks: Dict, side: str, joints: List[str]) -> float:
         return sum(cls._visibility(landmarks, f"{side}_{joint}") for joint in joints) / len(joints)
@@ -99,46 +85,61 @@ class PushupTracker:
             return None
         return calculate_angle(coords[0], coords[1], coords[2])
 
-    def _angles(self, landmarks: Dict[str, Any]) -> Tuple[float | None, float | None]:
-        elbow_angles: List[Tuple[float, float]] = []
-        back_angles: List[Tuple[float, float]] = []
+    def _side_has_joints(self, landmarks: Dict[str, Any], side: str, joints: Tuple[str, ...]) -> bool:
+        return all(self._coord(landmarks, f"{side}_{joint}") is not None for joint in joints)
 
+    def _best_visible_side(self, landmarks: Dict[str, Any]) -> str | None:
+        candidates = []
         for side in ("left", "right"):
-            elbow_angle = self._calculate_side_angle(landmarks, side, ("shoulder", "elbow", "wrist"))
-            if elbow_angle is not None:
-                elbow_angles.append((elbow_angle, self._side_weight(landmarks, side, ["shoulder", "elbow", "wrist"])))
+            if self._side_has_joints(landmarks, side, self.UPPER_BODY_JOINTS):
+                candidates.append((self._side_weight(landmarks, side, list(self.UPPER_BODY_JOINTS)), side))
+        if not candidates:
+            return None
+        return max(candidates, key=lambda candidate: candidate[0])[1]
 
+    def _posture_mode(self, landmarks: Dict[str, Any], side: str) -> str:
+        if self._coord(landmarks, f"{side}_ankle") is not None:
+            return self.POSTURE_FULL
+        if self._coord(landmarks, f"{side}_knee") is not None:
+            return self.POSTURE_KNEE_FALLBACK
+        return self.POSTURE_INFERRED_LOWER_BODY
+
+    def _back_angle_for_side(self, landmarks: Dict[str, Any], side: str, posture_mode: str) -> float | None:
+        if posture_mode == self.POSTURE_FULL:
             back_angle = self._calculate_side_angle(landmarks, side, ("shoulder", "hip", "ankle"), space="world")
             if back_angle is None:
                 back_angle = self._calculate_side_angle(landmarks, side, ("shoulder", "hip", "ankle"))
-            if back_angle is None:
-                back_angle = self._calculate_side_angle(landmarks, side, ("shoulder", "hip", "knee"), space="world")
+            return back_angle
+        if posture_mode == self.POSTURE_KNEE_FALLBACK:
+            back_angle = self._calculate_side_angle(landmarks, side, ("shoulder", "hip", "knee"), space="world")
             if back_angle is None:
                 back_angle = self._calculate_side_angle(landmarks, side, ("shoulder", "hip", "knee"))
-            if back_angle is not None:
-                joints = ["shoulder", "hip", "ankle"] if self._coord(landmarks, f"{side}_ankle") is not None else ["shoulder", "hip", "knee"]
-                back_angles.append((back_angle, self._side_weight(landmarks, side, joints)))
+            return back_angle
+        return None
 
-        return self._weighted_mean(elbow_angles), self._weighted_mean(back_angles)
+    def _angles(self, landmarks: Dict[str, Any]) -> Tuple[float | None, float | None, str | None, str | None]:
+        side = self._best_visible_side(landmarks)
+        if side is None:
+            return None, None, None, None
+
+        elbow_angle = self._calculate_side_angle(landmarks, side, ("shoulder", "elbow", "wrist"))
+        posture_mode = self._posture_mode(landmarks, side)
+        back_angle = self._back_angle_for_side(landmarks, side, posture_mode)
+        return elbow_angle, back_angle, side, posture_mode
 
     def _has_required_side(self, landmarks: Dict[str, Any]) -> bool:
-        upper_body_joints = ("shoulder", "elbow", "wrist", "hip")
-        return any(
-            all(self._coord(landmarks, f"{side}_{joint}") is not None for joint in upper_body_joints) and
-            (
-                self._coord(landmarks, f"{side}_ankle") is not None or
-                self._coord(landmarks, f"{side}_knee") is not None
-            )
-            for side in ("left", "right")
-        )
+        return self._best_visible_side(landmarks) is not None
 
-    def _is_horizontal(self, landmarks: Dict[str, Any]) -> bool:
-        shoulder_y = self._avg_coord(landmarks, ["left_shoulder", "right_shoulder"], 1)
-        lower_body_y = self._avg_coord(landmarks, ["left_ankle", "right_ankle"], 1)
-        if lower_body_y is None:
-            lower_body_y = self._avg_coord(landmarks, ["left_knee", "right_knee"], 1)
-        if shoulder_y is None or lower_body_y is None:
-            return False
+    def _is_horizontal(self, landmarks: Dict[str, Any], side: str, posture_mode: str) -> bool:
+        if posture_mode == self.POSTURE_INFERRED_LOWER_BODY:
+            return True
+        lower_joint = "ankle" if posture_mode == self.POSTURE_FULL else "knee"
+        shoulder = self._coord(landmarks, f"{side}_shoulder")
+        lower_body = self._coord(landmarks, f"{side}_{lower_joint}")
+        if shoulder is None or lower_body is None:
+            return True
+        shoulder_y = shoulder[1]
+        lower_body_y = lower_body[1]
         return abs(shoulder_y - lower_body_y) < self.VERTICAL_THRESHOLD
 
     def _shoulder_width(self, landmarks: Dict[str, Any]) -> float | None:
@@ -163,19 +164,20 @@ class PushupTracker:
         self._rep_min_back = None
         self._rep_fault_codes = set()
 
-    def _start_rep_quality(self, timestamp_ms: float, elbow_angle: float, back_angle: float) -> None:
+    def _start_rep_quality(self, timestamp_ms: float, elbow_angle: float, back_angle: float | None) -> None:
         self._rep_start_ms = timestamp_ms
         self._rep_min_elbow = elbow_angle
         self._rep_max_elbow = elbow_angle
         self._rep_min_back = back_angle
         self._rep_fault_codes = set()
 
-    def _update_rep_quality(self, elbow_angle: float, back_angle: float, faults: List[Dict[str, str]]) -> None:
+    def _update_rep_quality(self, elbow_angle: float, back_angle: float | None, faults: List[Dict[str, str]]) -> None:
         if self._rep_start_ms is None:
             return
         self._rep_min_elbow = min(self._rep_min_elbow, elbow_angle) if self._rep_min_elbow is not None else elbow_angle
         self._rep_max_elbow = max(self._rep_max_elbow, elbow_angle) if self._rep_max_elbow is not None else elbow_angle
-        self._rep_min_back = min(self._rep_min_back, back_angle) if self._rep_min_back is not None else back_angle
+        if back_angle is not None:
+            self._rep_min_back = min(self._rep_min_back, back_angle) if self._rep_min_back is not None else back_angle
         for fault in faults:
             self._rep_fault_codes.add(fault["code"])
 
@@ -245,6 +247,19 @@ class PushupTracker:
             return False
         return True
 
+    def _elbow_angle_confident(self, landmarks: Dict[str, Any], selected_side: str, selected_angle: float) -> bool:
+        alternate_side = "right" if selected_side == "left" else "left"
+        if not self._side_has_joints(landmarks, alternate_side, self.UPPER_BODY_JOINTS):
+            return True
+
+        alternate_angle = self._calculate_side_angle(landmarks, alternate_side, ("shoulder", "elbow", "wrist"))
+        if alternate_angle is None:
+            return True
+
+        selected_weight = self._side_weight(landmarks, selected_side, list(self.UPPER_BODY_JOINTS))
+        alternate_weight = self._side_weight(landmarks, alternate_side, list(self.UPPER_BODY_JOINTS))
+        return abs(selected_angle - alternate_angle) <= 50.0 or abs(selected_weight - alternate_weight) > 0.15
+
     def process_frame(self, landmarks_dict: Dict[str, Any], timestamp_ms: float | None = None) -> Dict[str, Any]:
         timestamp_ms = timestamp_ms if timestamp_ms is not None else time.monotonic() * 1000
         faults: List[Dict[str, str]] = []
@@ -259,20 +274,27 @@ class PushupTracker:
                 self._form_maintained = True
                 self._reset_back_form_tracking()
                 self._reset_rep_quality()
-                faults.append(make_fault("LANDMARKS_MISSING", "high", "Full body not visible"))
-            return self._status(perfect_form=False, faults=faults, setup_guidance="Move so shoulders, elbows, wrists, hips, and at least knees are visible")
+                faults.append(make_fault("LANDMARKS_MISSING", "high", "Upper body not visible"))
+            return self._status(perfect_form=False, faults=faults, setup_guidance="Move so one shoulder, elbow, wrist, and hip are visible")
 
         self._landmark_loss_counter = 0
-        elbow_angle, back_angle = self._angles(landmarks_dict)
-        if elbow_angle is None or back_angle is None:
-            faults.append(make_fault("LANDMARKS_MISSING", "high", "Full body not visible"))
-            return self._status(perfect_form=False, faults=faults, setup_guidance="Move so your full side profile is visible")
+        elbow_angle, back_angle, side, posture_mode = self._angles(landmarks_dict)
+        if elbow_angle is None or side is None or posture_mode is None:
+            faults.append(make_fault("LANDMARKS_MISSING", "high", "Upper body not visible"))
+            return self._status(perfect_form=False, faults=faults, setup_guidance="Move so one shoulder, elbow, wrist, and hip are visible")
+
+        if not self._elbow_angle_confident(landmarks_dict, side, elbow_angle):
+            faults.append(make_fault("CAMERA_ANGLE_UNCERTAIN", "info", "Use a side or 3/4 view"))
+            if self.state in (PushupState.DESCENDING, PushupState.BOTTOM, PushupState.ASCENDING):
+                self._form_maintained = False
+                self._rep_fault_codes.add("CAMERA_ANGLE_UNCERTAIN")
+            return self._status(perfect_form=False, faults=faults, setup_guidance="Turn slightly sideways so one arm is easier to track", elbow_angle=elbow_angle, back_angle=back_angle)
 
         if self._is_too_close(landmarks_dict):
             faults.append(make_fault("TOO_CLOSE", "medium", "Step back from camera"))
-            return self._status(perfect_form=False, faults=faults, setup_guidance="Step back until your full body fits", elbow_angle=elbow_angle, back_angle=back_angle)
+            return self._status(perfect_form=False, faults=faults, setup_guidance="Step back until your upper body fits", elbow_angle=elbow_angle, back_angle=back_angle)
 
-        if not self._is_horizontal(landmarks_dict):
+        if not self._is_horizontal(landmarks_dict, side, posture_mode):
             self.state = PushupState.IDLE
             self._calibrated = False
             self._calibration_counter = 0
@@ -281,6 +303,9 @@ class PushupTracker:
             self._reset_rep_quality()
             faults.append(make_fault("BODY_NOT_HORIZONTAL", "medium", "Get into a plank position"))
             return self._status(perfect_form=True, faults=faults, setup_guidance="Get into a side-on plank position", elbow_angle=elbow_angle, back_angle=back_angle)
+
+        if posture_mode == self.POSTURE_INFERRED_LOWER_BODY:
+            self._reset_back_form_tracking()
 
         if not self._calibrated:
             self.state = PushupState.CALIBRATING
@@ -329,7 +354,7 @@ class PushupTracker:
             elif elbow_angle <= self.ELBOW_FLEXION:
                 self.state = PushupState.BOTTOM
 
-        if not self._evaluate_back_form(back_angle, faults):
+        if back_angle is not None and not self._evaluate_back_form(back_angle, faults):
             perfect_form = False
 
         self._update_rep_quality(elbow_angle, back_angle, faults)
