@@ -10,17 +10,17 @@ Designed for users managing daily rep goals or strict hypertrophy routines, this
 
 ## Key Features
 
-*   **Real-Time Inference:** Low-latency video processing and form feedback streamed via WebSockets.
-*   **Stable Tracking:** MediaPipe Pose running in a real-time configuration with EMA (Exponential Moving Average) smoothing, low-visibility landmark filtering, and 3D world-landmark back-angle checks when enough lower-body landmarks are visible.
-*   **Algorithmic Strictness:** Mathematical heuristics only count reps meeting biomechanical angle thresholds, with back-form checks debounced so brief pose-estimation noise does not incorrectly reject an otherwise clean rep.
-*   **Guided Calibration:** Pushups and squats require a short stable setup hold before counting begins, adapting the tracker to the current camera/body position. Pushups are optimized for side or 3-quarter views and can keep tracking when feet are cropped, as long as the working-side shoulder, elbow, wrist, and hip remain visible.
-*   **Structured Coaching:** Backend responses include structured fault codes, severity, setup guidance, calibration progress, and per-rep quality metrics in addition to compatibility warning strings.
-*   **Multi-Exercise Sessions:** The frontend supports manual Pushups/Squats selection, persists mixed workout history, migrates old pushup-only sessions, and exports v2 JSON logs with rep quality data.
-*   **Faster Streaming:** The frontend now captures downscaled JPEG blobs and streams them as binary WebSocket frames, reducing client/server overhead compared with base64 payloads.
-*   **Audio Coaching:** Built-in synthesized audio cues (ding for a perfect rep, buzz for bad form) allow you to maintain neutral neck posture while exercising.
-*   **Data Portability:** Export full session logs to JSON, complete with timestamps and form metadata, for integration with personal trackers.
-*   **Privacy-First:** Edge-based processing means your webcam feed never leaves your local machine.
-*   **Modern Stack:** A decoupled architecture utilizing a React frontend and a robust Python/FastAPI backend.
+* **Real-Time Inference:** Low-latency video processing and form feedback streamed via WebSockets.
+* **Stable Tracking:** MediaPipe Pose running in a real-time configuration with EMA (Exponential Moving Average) smoothing, low-visibility landmark filtering, and 3D world-landmark back-angle checks when enough lower-body landmarks are visible.
+* **Algorithmic Strictness:** Mathematical heuristics only count reps meeting biomechanical angle thresholds, with back-form checks debounced so brief pose-estimation noise does not incorrectly reject an otherwise clean rep.
+* **Guided Calibration:** Pushups and squats require a short stable setup hold before counting begins, adapting the tracker to the current camera/body position. Pushups are optimized for side or 3-quarter views and can keep tracking when feet are cropped, as long as the working-side shoulder, elbow, wrist, and hip remain visible.
+* **Structured Coaching:** Backend responses include structured fault codes, severity, setup guidance, calibration progress, and per-rep quality metrics in addition to compatibility warning strings.
+* **Multi-Exercise Sessions:** The frontend supports manual Pushups/Squats selection, persists mixed workout history, migrates old pushup-only sessions, and exports v2 JSON logs with rep quality data.
+* **Faster Streaming:** The frontend now captures downscaled JPEG blobs and streams them as binary WebSocket frames, reducing client/server overhead compared with base64 payloads.
+* **Audio Coaching:** Built-in synthesized audio cues (ding for a perfect rep, buzz for bad form) allow you to maintain neutral neck posture while exercising.
+* **Data Portability:** Export full session logs to JSON, complete with timestamps and form metadata, for integration with personal trackers.
+* **Privacy-First:** Edge-based processing means your webcam feed never leaves your local machine.
+* **Modern Stack:** A decoupled architecture utilizing a React frontend and a robust Python/FastAPI backend.
 
 ## Getting Started (Local Development)
 
