@@ -14,7 +14,7 @@ const JPEG_QUALITY = 0.6;
 
 export default function useWebcam() {
   const videoRef = useRef(null);
-  const canvasRef = useRef(document.createElement('canvas'));
+  const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const [error, setError] = useState(null);
   const [isReady, setIsReady] = useState(false);
@@ -67,6 +67,9 @@ export default function useWebcam() {
     const captureWidth = Math.min(sourceWidth, MAX_CAPTURE_WIDTH);
     const captureHeight = Math.round((sourceHeight * captureWidth) / sourceWidth);
 
+    if (!canvasRef.current) {
+      canvasRef.current = document.createElement('canvas');
+    }
     const canvas = canvasRef.current;
     if (canvas.width !== captureWidth || canvas.height !== captureHeight) {
       canvas.width = captureWidth;

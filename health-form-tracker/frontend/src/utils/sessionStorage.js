@@ -118,7 +118,7 @@ export function appendRepEvent(session, exercise, result, payload = {}) {
         attempt: nextAttempt,
         timestamp,
         result,
-        perfectForm: result === 'completed',
+        perfectForm: faultCodes.length === 0,
         quality,
         faultCodes,
       },
