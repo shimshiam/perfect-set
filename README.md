@@ -2,25 +2,34 @@
 
 ## Description
 
-This project is a real-time, privacy-first computer vision application designed to provide immediate physical form correction and automated workout tracking. Built with React, FastAPI, PyTorch, and OpenCV, it acts as a localized digital personal trainer that runs directly through a standard webcam.
+Perfect Set is a real-time computer vision application that provides automated repetition tracking and heuristic form feedback for pushups and squats. It uses React, FastAPI, OpenCV, and MediaPipe Pose, and runs through a standard webcam with a local backend by default.
 
-The application tracks high-volume pushup and squat sets. By leveraging pose estimation (MediaPipe) and biomechanical vector math, the system calculates joint angles frame-by-frame to enforce strict form requirements. It actively monitors pushup depth/lockout, squat depth, and spinal/torso alignment, automatically filtering out "cheat" reps while tolerating brief landmark jitter instead of failing form on a single noisy frame.
+The application uses MediaPipe's pretrained pose-estimation pipeline to extract body landmarks. Rule-based state machines then calculate joint angles frame by frame to identify exercise phases, count repetitions that cross configured thresholds, and provide feedback about pushup depth and extension, back alignment, squat depth, and body alignment. Temporal smoothing and multi-frame fault checks reduce sensitivity to brief landmark jitter.
 
-Designed for users managing daily rep goals or strict hypertrophy routines, this tool eliminates the guesswork of solo workouts. It ensures that every logged rep is performed with perfect, injury-free mechanics—all processed locally without sending personal video feeds to the cloud.
+Perfect Set is an experimental fitness-tracking project, not a medical, coaching, or injury-prevention system. Its feedback depends on camera placement, landmark visibility, and manually configured thresholds, so it should not be treated as a guarantee of correct or safe exercise form.
 
 ## Key Features
 
 * **Real-Time Inference:** Low-latency video processing and form feedback streamed via WebSockets.
 * **Stable Tracking:** MediaPipe Pose running in a real-time configuration with EMA (Exponential Moving Average) smoothing, low-visibility landmark filtering, and 3D world-landmark back-angle checks when enough lower-body landmarks are visible.
-* **Algorithmic Strictness:** Mathematical heuristics only count reps meeting biomechanical angle thresholds, with back-form checks debounced so brief pose-estimation noise does not incorrectly reject an otherwise clean rep.
-* **Guided Calibration:** Pushups and squats require a short stable setup hold before counting begins, adapting the tracker to the current camera/body position. Pushups are optimized for side or 3-quarter views and can keep tracking when feet are cropped, as long as the working-side shoulder, elbow, wrist, and hip remain visible.
+* **Heuristic Rep Validation:** Configurable joint-angle thresholds determine exercise phases and repetition completion. Multi-frame back and torso checks prevent a single noisy frame from rejecting a repetition.
+* **Guided Setup:** Pushups and squats require a 30-frame setup hold before counting begins. This currently verifies that the required pose and landmarks remain available; it does not personalize the exercise thresholds. Pushups are optimized for side or 3-quarter views and can keep tracking when feet are cropped, as long as the working-side shoulder, elbow, wrist, and hip remain visible.
 * **Structured Coaching:** Backend responses include structured fault codes, severity, setup guidance, calibration progress, and per-rep quality metrics in addition to compatibility warning strings.
 * **Multi-Exercise Sessions:** The frontend supports manual Pushups/Squats selection, persists mixed workout history, migrates old pushup-only sessions, and exports v2 JSON logs with rep quality data.
 * **Faster Streaming:** The frontend now captures downscaled JPEG blobs and streams them as binary WebSocket frames, reducing client/server overhead compared with base64 payloads.
-* **Audio Coaching:** Built-in synthesized audio cues (ding for a perfect rep, buzz for bad form) allow you to maintain neutral neck posture while exercising.
+* **Audio Feedback:** Built-in synthesized audio cues announce counted repetitions and detected form faults without requiring the user to watch the dashboard continuously.
 * **Data Portability:** Export full session logs to JSON, complete with timestamps and form metadata, for integration with personal trackers.
-* **Privacy-First:** Edge-based processing means your webcam feed never leaves your local machine.
+* **Local by Default:** With the default configuration, webcam frames travel from the browser to a FastAPI backend on the same machine and are processed without being stored. If the frontend is configured to use a remote WebSocket backend, frames will leave the local machine and must be protected in transit.
 * **Modern Stack:** A decoupled architecture utilizing a React frontend and a robust Python/FastAPI backend.
+
+## Current Technical Scope and Limitations
+
+* MediaPipe Pose supplies the pretrained pose model. Perfect Set does not currently train or fine-tune a custom PyTorch or TensorFlow model.
+* Exercise classifications are produced by manually configured thresholds and state machines, not by a learned form-classification model.
+* Cropped-leg pushup mode can count repetitions using upper-body landmarks, but it cannot evaluate back alignment without reliable knee or ankle landmarks.
+* Full head-on pushups are less reliable than side and 3-quarter views because elbow depth and body alignment are harder to infer from the available landmarks.
+* The automated tests validate geometry, state transitions, fault handling, and WebSocket responses using synthetic landmarks and mocked components. They do not yet establish accuracy on a labeled real-world video dataset.
+* Before making comparative accuracy claims, the tracker needs an offline evaluation set with ground-truth repetition boundaries and form-fault labels across multiple users, camera angles, lighting conditions, and occlusion levels.
 
 ## Getting Started (Local Development)
 
@@ -137,6 +146,8 @@ Backend unit tests can be run from `health-form-tracker`:
 ```bash
 python3 -m unittest discover backend/tests
 ```
+
+These tests exercise deterministic tracker behavior with synthetic inputs. They should be supplemented with an offline video evaluation harness before reporting real-world precision, recall, or form-detection accuracy.
 
 Frontend production build can be checked from `health-form-tracker/frontend`:
 
